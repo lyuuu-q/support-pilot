@@ -12,13 +12,14 @@
 
 - 设计并实现 Provider 中立的 LangGraph 支持工作流，将意图/风险识别、混合 RAG、确定性业务工具、Answerability Gate、显式工单确认与人工接管串成可持久化闭环；用同文档/同主题/同版本的受控多证据门控解决跨 chunk 问题，80 条人工标注合成场景（91 个请求步骤）全部通过，重复副作用与高风险误执行均为 0。
 - 基于 PostgreSQL/pgvector 实现关键词与向量双路召回、RRF、BGE Reranker、元数据过滤和 chunk 级引用；拆分 60 条 calibration 与 30 条冻结后 holdout，本地 BGE 在 holdout 上的 Recall@5 1.000、MRR 0.975、nDCG@5 0.982、Answerability F1 0.974，无答案误放行为 0。
-- 构建 JWT/RBAC、多租户隔离、工单状态机、事务/幂等/乐观锁与审计，使用 React + SSE 展示真实节点 Trace、引用和人工处理；118 个后端测试覆盖率 93%，10 个前端单元测试及 1 条 Chromium 业务 E2E 通过，CI 还验证 Compose 构建、启动和前端反向代理探活。
+- 构建 JWT/RBAC、多租户隔离、工单状态机、事务/幂等/乐观锁与审计，使用 React + SSE 展示真实节点 Trace、引用和人工处理；121 个后端测试覆盖率 93%，10 个前端单元测试及 1 条 Chromium 业务 E2E 通过，CI 还验证 Compose 构建、启动和前端反向代理探活。
 - 将 RAG 证据粒度从 chunk 降到 claim，使用确定性 verifier 校验原文支持和技术标识，在 React 控制台两级展示 claim 与 chunk 引用，并在独立 faithfulness v2 数据集上跟踪覆盖率、支持率、引用精度和难负例误答率。
 - 支持浏览器中止 SSE 等待，并在重试确认时复用同一幂等键；后端 SSE 增加事件 id，为后续服务端事件回放保留协议基础。
 - 工单队列使用 created_at + id 不透明游标，支持状态筛选和工单号/摘要搜索，前端按需加载更多。
 - Agent 运行使用 PostgresSaver 保存节点级 checkpoint，支持 interrupted 运行恢复；延迟从约 46ms 提升到约 700ms。
 - SSE progress/result 事件按 run_id + sequence 持久化，所有者可通过回放 API 读取断线前事件，为 Last-Event-ID 续传提供基础。
 - 前端在 SSE 网络中断后自动回放已发生事件并调用 checkpoint 恢复接口，无需用户重新提交。
+- 恢复使用 PostgreSQL 行锁和 resuming 状态防止并发重复执行；提供带 dry-run 的历史清理脚本，保留活跃运行及其事件。
 
 ## 指标证据索引
 
@@ -30,7 +31,7 @@
 | calibration 四项 1.000 | `docs/evaluation/stage-3-rag-evaluation.md` | 60 条同源合成样本，仅作校准/回归 |
 | Qwen 7/7 冒烟 | `docs/evaluation/stage-4-qwen-smoke-evaluation.md` | 仅 7 条、调用 5 次 |
 | 0 重复副作用/高风险误执行 | Agent 机器报告 + PostgreSQL 并发测试 | 非生产流量 |
-| 118 tests / 93% | 2026-10-12 P0+P1a+P2+P1b+P1c 全量 pytest 记录 | local BGE 文件未计入常规覆盖 |
+| 121 tests / 93% | 2026-10-12 P0+P1a+P2+P1b+P1c+P1d 全量 pytest 记录 | local BGE 文件未计入常规覆盖 |
 | 7 frontend tests | Vitest + Testing Library | jsdom 单元/组件层 |
 | 1 browser E2E | Playwright Chromium：客户提问到人工处理 | deterministic Provider、单浏览器、隔离测试库 |
 | claim support 1.000 / false answer 0.000 / coverage 0.8333 | `docs/evaluation/results/faithfulness-deterministic-v1.json` | 12 条合成问题，3 个 required claim 覆盖缺口，非生产忠实度 |

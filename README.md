@@ -148,7 +148,7 @@ uv run python scripts/evaluate_faithfulness.py
 
 SMTP 密码与 Webhook URL 使用 `SecretStr` 保存；认证 SMTP 强制启用证书和主机名校验，Webhook 强制 HTTPS、显式主机白名单并拒绝非公网 IP 与环境代理。自动化测试只使用 Mock/Fake 外部边界，不代表真实邮件或群机器人已经完成线上投递验证。
 
-当前验证结果为 118 项后端测试（覆盖率 93%）通过；10 项前端单元测试和 1 条 Chromium 业务 E2E 已在本机复跑通过；80 场景 deterministic Agent 评测 80/80；faithfulness v2 的 claim support rate 为 1.000、false answer rate 为 0.000、claim coverage 为 0.8333。Alembic upgrade/check 已通过。浏览器 E2E 使用确定性 Provider、隔离的 `support_pilot_test` 数据库和 `log` 通知通道，不会调用付费模型或外部通知服务。
+当前验证结果为 121 项后端测试（覆盖率 93%）通过；10 项前端单元测试和 1 条 Chromium 业务 E2E 已在本机复跑通过；80 场景 deterministic Agent 评测 80/80；faithfulness v2 的 claim support rate 为 1.000、false answer rate 为 0.000、claim coverage 为 0.8333。Alembic upgrade/check 已通过。浏览器 E2E 使用确定性 Provider、隔离的 `support_pilot_test` 数据库和 `log` 通知通道，不会调用付费模型或外部通知服务。
 
 ## 验证
 
@@ -232,3 +232,7 @@ npm run test:e2e
 - [前端 SSE 断线恢复 ADR](./docs/adr/0013-frontend-stream-recovery.md)
 - [第十四阶段恢复评测](./docs/evaluation/stage-14-frontend-stream-recovery-evaluation.md)
 - [第十四阶段学习说明](./docs/learning/stage-14-frontend-stream-recovery.md)
+- [第十五阶段保留与恢复锁验收](./docs/product/stage-15-acceptance.md)
+- [历史保留与恢复锁 ADR](./docs/adr/0014-agent-history-retention-and-resume-guard.md)
+- [第十五阶段清理评测](./docs/evaluation/stage-15-retention-and-resume-guard-evaluation.md)
+- [第十五阶段学习说明](./docs/learning/stage-15-retention-and-resume-guard.md)
