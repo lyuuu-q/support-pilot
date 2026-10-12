@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     otel_exporter_otlp_endpoint: str = "http://localhost:4318/v1/traces"
     agent_max_attempts: int = Field(default=2, ge=1, le=3)
     agent_checkpoint_enabled: bool = True
+    agent_resume_stale_seconds: int = Field(default=300, ge=30, le=86_400)
+    agent_run_retention_days: int = Field(default=30, ge=1)
+    agent_run_event_retention_days: int = Field(default=7, ge=1)
+    agent_run_prune_batch_size: int = Field(default=500, ge=1, le=10_000)
     qwen_api_key: SecretStr | None = Field(
         default=None,
         validation_alias=AliasChoices(

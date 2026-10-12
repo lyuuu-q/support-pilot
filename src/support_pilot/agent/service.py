@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from typing import Any, Literal, TypeAlias, cast
 from uuid import UUID, uuid4
@@ -16,6 +17,7 @@ from support_pilot.agent.contracts import (
 )
 from support_pilot.agent.providers import DecisionProvider
 from support_pilot.agent.workflow import AgentState, build_agent_graph, response_from_state
+from support_pilot.config import get_settings
 from support_pilot.domain.enums import UserRole
 from support_pilot.domain.errors import (
     AuthorizationError,
@@ -192,11 +194,15 @@ class AgentService:
         yield result_event
 
     def resume_run(self, run_id: UUID, *, actor: UserAccount) -> AgentResponse:
-        run = self.session.get(AgentRun, run_id)
+        run = self.session.scalar(
+            select(AgentRun).where(AgentRun.id == run_id).with_for_update()
+        )
         if run is None or run.user_id != actor.id:
             raise ResourceNotFoundError("agent run not found")
-        if run.status not in {"running", "interrupted"}:
+        if not self._can_resume(run):
             raise RequestPreconditionError("agent run is not resumable")
+        run.status = "resuming"
+        self.session.commit()
         conversation = self.session.scalar(
             select(AgentConversation).where(
                 AgentConversation.session_id == run.session_id,
@@ -284,6 +290,19 @@ class AgentService:
         self.session.add(run)
         self.session.commit()
 
+    @staticmethod
+    def _can_resume(run: AgentRun) -> bool:
+        if run.status in {"running", "interrupted"}:
+            return True
+        if run.status != "resuming":
+            return False
+        updated_at = run.updated_at
+        if updated_at is None:
+            return False
+        if updated_at.tzinfo is None:
+            updated_at = updated_at.replace(tzinfo=UTC)
+        stale_after = timedelta(seconds=get_settings().agent_resume_stale_seconds)
+        return datetime.now(UTC) - updated_at > stale_after
     def _append_run_event(
         self,
         *,

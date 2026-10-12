@@ -310,7 +310,7 @@ class AgentRun(Base, TimestampMixin):
     __tablename__ = "agent_runs"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('running', 'interrupted', 'answered', 'needs_clarification', "
+            "status IN ('running', 'resuming', 'interrupted', 'answered', 'needs_clarification', "
             "'needs_confirmation', 'escalated', 'refused', 'cancelled', 'failed')",
             name="valid_status",
         ),

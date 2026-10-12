@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -730,7 +731,13 @@ def test_agent_run_events_replay_after_sequence(
     assert replay.status_code == 200
     items = replay.json()["items"]
     assert [item["sequence"] for item in items] == list(range(1, len(items) + 1))
-    assert [item["event"] for item in items] == ["progress", "progress", "progress", "progress", "result"]
+    assert [item["event"] for item in items] == [
+        "progress",
+        "progress",
+        "progress",
+        "progress",
+        "result",
+    ]
     assert items[-1]["payload"]["request_id"] == run_id
 
     after = client.get(
@@ -749,3 +756,67 @@ def test_agent_run_events_replay_after_sequence(
         headers={"X-User-Id": str(other_user.id)},
     )
     assert denied.status_code == 404
+
+
+def test_agent_resume_is_guarded_against_concurrent_calls(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    ingest_manifest(
+        db_session,
+        manifest_path=Path("data/knowledge/manifest.json"),
+        embedding_provider=DeterministicEmbeddingProvider(),
+    )
+    created = client.post(
+        "/api/v1/agent/resolve",
+        headers=_headers(db_session),
+        json={"message": "如何查询限流响应头？"},
+    )
+    run_id = created.json()["request_id"]
+    run = db_session.get(AgentRun, UUID(run_id))
+    assert run is not None
+    run.status = "interrupted"
+    db_session.commit()
+    user = _user(db_session)
+    headers = {"X-User-Id": str(user.id)}
+
+    def resume(_index: int) -> int:
+        return client.post(
+            f"/api/v1/agent/runs/{run_id}/resume",
+            headers=headers,
+        ).status_code
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        statuses = sorted(executor.map(resume, range(2)))
+
+    assert statuses == [200, 400]
+
+
+def test_stale_resuming_run_can_be_resumed(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    ingest_manifest(
+        db_session,
+        manifest_path=Path("data/knowledge/manifest.json"),
+        embedding_provider=DeterministicEmbeddingProvider(),
+    )
+    created = client.post(
+        "/api/v1/agent/resolve",
+        headers=_headers(db_session),
+        json={"message": "HTTP 429 响应里的 Retry-After 应该如何处理？"},
+    )
+    run_id = created.json()["request_id"]
+    run = db_session.get(AgentRun, UUID(run_id))
+    assert run is not None
+    run.status = "resuming"
+    run.updated_at = datetime.now(UTC) - timedelta(minutes=10)
+    db_session.commit()
+
+    resumed = client.post(
+        f"/api/v1/agent/runs/{run_id}/resume",
+        headers=_headers(db_session),
+    )
+
+    assert resumed.status_code == 200
+    assert resumed.json()["request_id"] == run_id
