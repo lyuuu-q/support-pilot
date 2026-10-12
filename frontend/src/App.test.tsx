@@ -119,4 +119,49 @@ describe('SupportPilot console', () => {
     await waitFor(() => expect(screen.getAllByText('triaged')).not.toHaveLength(0))
     expect(screen.getByText('open → triaged')).toBeInTheDocument()
   })
+  it('recovers a dropped stream from persisted events', async () => {
+    localStorage.setItem('support-pilot-token', 'customer-token')
+    const recoveredResult = {
+      request_id: 'run-1', session_id: 's', trace_id: 'trace-recovered', outcome: 'answered',
+      intent: 'knowledge', risk_level: 'R1', message: '已恢复的回答', response_mode: 'extractive',
+      citations: [], claims: [], tool_result: null, ticket_draft: null, required_fields: [],
+      escalation_reason: null, conversation_status: 'completed',
+      model_usage: { model_calls: 0, total_tokens: 0, estimated_cost_cny: 0 }, trace: [],
+    }
+    const encoder = new TextEncoder()
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/auth/me')) return jsonResponse(customer)
+      if (url.endsWith('/agent/resolve/stream')) {
+        let step = 0
+        return new Response(new ReadableStream({
+          pull(controller) {
+            if (step === 0) {
+              step = 1
+              controller.enqueue(encoder.encode('id: run-1:1\nevent: progress\ndata: {"sequence":1,"node":"preflight_safety","status":"succeeded","detail":"safe"}\n\n'))
+              return
+            }
+            controller.error(new Error('network down'))
+          },
+        }), { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+      }
+      if (url.includes('/agent/runs/run-1/events')) {
+        return jsonResponse({ items: [
+          { sequence: 1, event: 'progress', event_id: 'run-1:1', payload: { sequence: 1, node: 'preflight_safety', status: 'succeeded', detail: 'safe' } },
+          { sequence: 2, event: 'result', event_id: 'run-1:2', payload: recoveredResult },
+        ] })
+      }
+      throw new Error(`unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    await screen.findByText('Alpha Admin')
+    await userEvent.click(screen.getByRole('button', { name: '开始诊断' }))
+
+    expect(await screen.findByText('已恢复的回答')).toBeInTheDocument()
+    expect(screen.getByText('已从服务端恢复断线前的事件。')).toBeInTheDocument()
+    expect(screen.getByText('preflight_safety')).toBeInTheDocument()
+  })
+
 })

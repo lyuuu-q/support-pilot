@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { listTickets, streamAgent } from './api'
+import { listRunEvents, listTickets, resumeAgentRun, streamAgent } from './api'
 
 function streamResponse(chunks: string[]): Response {
   const encoder = new TextEncoder()
@@ -66,6 +66,39 @@ describe('streamAgent', () => {
       expect.any(String),
       expect.objectContaining({ signal: controller.signal }),
     )
+  })
+  it('reports SSE event ids', async () => {
+    const ids: string[] = []
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(streamResponse([
+      'id: run-1:1\nevent: progress\ndata: {"sequence":1,"node":"classify","status":"succeeded","detail":"done"}\n\n',
+    ])))
+
+    await streamAgent('token', { message: 'hello' }, {
+      onProgress: vi.fn(),
+      onResult: vi.fn(),
+      onEventId: (eventId) => ids.push(eventId),
+    })
+
+    expect(ids).toEqual(['run-1:1'])
+  })
+
+  it('builds run replay and resume requests', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ request_id: 'run-1' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await listRunEvents('token', 'run-1', 2)
+    await resumeAgentRun('token', 'run-1')
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/agent/runs/run-1/events?after=2')
+    expect(fetchMock.mock.calls[1]?.[1]).toEqual(expect.objectContaining({ method: 'POST' }))
   })
   it('raises controlled SSE errors', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(streamResponse([

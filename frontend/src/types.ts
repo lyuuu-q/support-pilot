@@ -105,6 +105,12 @@ export interface Ticket {
   replayed: boolean
 }
 
+export interface RunEvent {
+  sequence: number
+  event: 'progress' | 'result'
+  payload: Record<string, unknown>
+  event_id: string
+}
 export interface ApiErrorBody {
   error?: { code?: string; message?: string }
 }

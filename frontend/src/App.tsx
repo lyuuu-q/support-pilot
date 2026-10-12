@@ -3,8 +3,10 @@ import {
   ApiError,
   claimTicket,
   getCurrentUser,
+  listRunEvents,
   listTickets,
   login,
+  resumeAgentRun,
   streamAgent,
   submitFeedback,
   transitionTicket,
@@ -104,6 +106,9 @@ function CustomerWorkspace({ token }: { token: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [stopped, setStopped] = useState(false)
+  const [recoveryNote, setRecoveryNote] = useState('')
+  const runIdRef = useRef<string | null>(null)
+  const lastEventIdRef = useRef<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const confirmationKeyRef = useRef<string | null>(null)
   const lastActionRef = useRef<'confirm_ticket' | 'cancel_ticket' | undefined>(undefined)
@@ -112,6 +117,9 @@ function CustomerWorkspace({ token }: { token: string }) {
     setBusy(true)
     setStopped(false)
     setError('')
+    setRecoveryNote('')
+    runIdRef.current = null
+    lastEventIdRef.current = null
     setTrace([])
     lastActionRef.current = confirmation
     const controller = new AbortController()
@@ -136,6 +144,10 @@ function CustomerWorkspace({ token }: { token: string }) {
     try {
       await streamAgent(token, payload, {
         onProgress: (event) => setTrace((current) => [...current, event]),
+        onEventId: (eventId) => {
+          lastEventIdRef.current = eventId
+          runIdRef.current = eventId.split(':')[0] ?? null
+        },
         onResult: (response) => {
           setResult(response)
           confirmationKeyRef.current = null
@@ -146,6 +158,17 @@ function CustomerWorkspace({ token }: { token: string }) {
         setStopped(true)
         setError('已停止等待。服务器可能已经完成本次运行；重试确认会复用同一幂等键。')
       } else {
+        const runId = runIdRef.current
+        if (runId) {
+          try {
+            await recoverRun(runId)
+            setRecoveryNote('已从服务端恢复断线前的事件。')
+            return
+          } catch (recoveryError) {
+            setError(messageFrom(recoveryError))
+            return
+          }
+        }
         setError(messageFrom(caught))
       }
     } finally {
@@ -153,6 +176,24 @@ function CustomerWorkspace({ token }: { token: string }) {
       setBusy(false)
     }
   }
+
+  async function recoverRun(runId: string) {
+    const response = await listRunEvents(token, runId)
+    const progressEvents = response.items
+      .filter((event) => event.event === 'progress')
+      .map((event) => event.payload as unknown as TraceEvent)
+    setTrace(progressEvents)
+    const resultEvent = [...response.items].reverse().find((event) => event.event === 'result')
+    if (resultEvent) {
+      setResult(resultEvent.payload as unknown as AgentResponse)
+      confirmationKeyRef.current = null
+      return
+    }
+    const resumed = await resumeAgentRun(token, runId)
+    setResult(resumed)
+    confirmationKeyRef.current = null
+  }
+
 
   function stop() {
     abortRef.current?.abort()
@@ -178,6 +219,7 @@ function CustomerWorkspace({ token }: { token: string }) {
           {!busy && stopped && <button className="ghost" onClick={retry}>重试上一步</button>}
         </div>
         {error && <p className="error-banner" role="alert">{error}</p>}
+        {recoveryNote && <p className="muted" role="status">{recoveryNote}</p>}
         <div className="session-note">Session · {sessionId.slice(0, 8)}</div>
       </section>
       <section className="panel result-panel">

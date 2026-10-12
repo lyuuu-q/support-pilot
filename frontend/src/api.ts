@@ -1,4 +1,4 @@
-import type { AgentResponse, ApiErrorBody, CurrentUser, Ticket, TicketStatus, TraceEvent } from './types'
+import type { AgentResponse, ApiErrorBody, CurrentUser, RunEvent, Ticket, TicketStatus, TraceEvent } from './types'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
@@ -54,6 +54,7 @@ export const getCurrentUser = (token: string) => request<CurrentUser>('/auth/me'
 interface StreamCallbacks {
   onProgress: (event: TraceEvent) => void
   onResult: (result: AgentResponse) => void
+  onEventId?: (eventId: string) => void
 }
 
 export async function streamAgent(
@@ -93,12 +94,15 @@ export async function streamAgent(
 
 function dispatchSseBlock(block: string, callbacks: StreamCallbacks): void {
   let eventName = 'message'
+  let eventId: string | undefined
   const dataLines: string[] = []
   for (const line of block.split(/\r?\n/)) {
+    if (line.startsWith('id:')) eventId = line.slice(3).trim()
     if (line.startsWith('event:')) eventName = line.slice(6).trim()
     if (line.startsWith('data:')) dataLines.push(line.slice(5).trimStart())
   }
   if (!dataLines.length) return
+  if (eventId) callbacks.onEventId?.(eventId)
   const payload = JSON.parse(dataLines.join('\n')) as unknown
   if (eventName === 'progress') callbacks.onProgress(payload as TraceEvent)
   if (eventName === 'result') callbacks.onResult(payload as AgentResponse)
@@ -108,6 +112,14 @@ function dispatchSseBlock(block: string, callbacks: StreamCallbacks): void {
   }
 }
 
+export const listRunEvents = (token: string, runId: string, after = 0) =>
+  request<{ items: RunEvent[] }>(
+    `/agent/runs/${runId}/events?after=${after}&limit=500`,
+    token,
+  )
+
+export const resumeAgentRun = (token: string, runId: string) =>
+  request<AgentResponse>(`/agent/runs/${runId}/resume`, token, { method: 'POST' })
 export interface TicketListOptions {
   status?: TicketStatus
   q?: string
