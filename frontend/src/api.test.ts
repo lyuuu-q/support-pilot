@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { streamAgent } from './api'
+import { listTickets, streamAgent } from './api'
 
 function streamResponse(chunks: string[]): Response {
   const encoder = new TextEncoder()
@@ -12,6 +12,26 @@ function streamResponse(chunks: string[]): Response {
   return new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
 }
 
+describe('listTickets', () => {
+  it('builds status, search, cursor and limit query parameters', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ items: [], total: 0, next_cursor: null }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await listTickets('token', { status: 'open', q: 'TKT-1', cursor: 'abc', limit: 5 })
+
+    const url = String(fetchMock.mock.calls[0]?.[0])
+    expect(url).toContain('/tickets?')
+    expect(url).toContain('limit=5')
+    expect(url).toContain('status=open')
+    expect(url).toContain('q=TKT-1')
+    expect(url).toContain('cursor=abc')
+  })
+})
 describe('streamAgent', () => {
   it('parses SSE events even when chunks split an event boundary', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(streamResponse([

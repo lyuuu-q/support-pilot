@@ -66,3 +66,7 @@ summary { cursor: pointer; font-size: 13px; font-weight: 700; }
 .claim-list code { display: block; margin-top: 6px; color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
 .claim-support { color: var(--green); border: 1px solid currentColor; padding: 3px 5px; font: 10px 'DM Mono'; white-space: nowrap; }
 @media (max-width: 760px) { .claim-list li { grid-template-columns: 1fr; } .claim-support { justify-self: start; } }
+
+.queue-filters { display: grid; gap: 8px; margin: 14px 0; }
+.queue-filters input, .queue-filters select { width: 100%; padding: 9px 10px; border: 1px solid #485b54; background: #16211e; color: white; font: 11px 'DM Mono'; }
+.queue-more { width: 100%; margin-top: 12px; color: var(--lime); border-color: #485b54; }

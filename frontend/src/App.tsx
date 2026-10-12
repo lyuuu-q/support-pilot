@@ -197,6 +197,15 @@ function CustomerWorkspace({ token }: { token: string }) {
   )
 }
 
+const TICKET_STATUSES: TicketStatus[] = [
+  'open',
+  'triaged',
+  'in_progress',
+  'waiting_customer',
+  'resolved',
+  'closed',
+]
+
 const NEXT_STATUS: Partial<Record<TicketStatus, TicketStatus[]>> = {
   triaged: ['in_progress'],
   in_progress: ['waiting_customer', 'resolved'],
@@ -209,33 +218,61 @@ function SupportWorkspace({ token, user }: { token: string; user: CurrentUser })
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
+  const [activeQuery, setActiveQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<TicketStatus | ''>('')
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [total, setTotal] = useState(0)
+  const nextCursorRef = useRef<string | null>(null)
   const selected = useMemo(() => tickets.find((ticket) => ticket.id === selectedId) ?? tickets[0] ?? null, [tickets, selectedId])
 
-  const refresh = useCallback(async () => {
+  const loadTickets = useCallback(async (append = false) => {
     try {
-      const response = await listTickets(token)
-      setTickets(response.items)
-    } catch (caught) { setError(messageFrom(caught)) }
-  }, [token])
+      const response = await listTickets(token, {
+        status: statusFilter || undefined,
+        q: activeQuery || undefined,
+        cursor: append ? nextCursorRef.current ?? undefined : undefined,
+      })
+      setTickets((current) => append ? [...current, ...response.items] : response.items)
+      nextCursorRef.current = response.next_cursor
+      setNextCursor(response.next_cursor)
+      setTotal(response.total)
+    } catch (caught) {
+      setError(messageFrom(caught))
+    }
+  }, [activeQuery, statusFilter, token])
+
   useEffect(() => {
-    listTickets(token)
-      .then((response) => setTickets(response.items))
-      .catch((caught: unknown) => setError(messageFrom(caught)))
-  }, [token])
+    void loadTickets()
+  }, [loadTickets])
+
+  function applySearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setActiveQuery(searchInput.trim())
+  }
 
   function replace(ticket: Ticket) {
     setTickets((current) => current.map((item) => item.id === ticket.id ? ticket : item))
   }
+
   async function mutate(action: () => Promise<Ticket>) {
     setBusy(true); setError('')
-    try { replace(await action()) } catch (caught) { setError(messageFrom(caught)); await refresh() } finally { setBusy(false) }
+    try { replace(await action()) } catch (caught) { setError(messageFrom(caught)); await loadTickets() } finally { setBusy(false) }
   }
 
   return (
     <div className="support-layout">
-      <aside className="queue-panel"><div className="queue-heading"><div><p className="eyebrow">Human handoff</p><h2>工单队列</h2></div><button className="icon-button" onClick={refresh} aria-label="刷新工单">↻</button></div>
-        <div className="queue-count">{tickets.length} 个待查看工单</div>
+      <aside className="queue-panel"><div className="queue-heading"><div><p className="eyebrow">Human handoff</p><h2>工单队列</h2></div><button className="icon-button" onClick={() => void loadTickets()} aria-label="刷新工单">↻</button></div>
+        <form className="queue-filters" onSubmit={applySearch}>
+          <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="搜索工单号或摘要" aria-label="搜索工单" />
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as TicketStatus | '')} aria-label="工单状态">
+            <option value="">全部状态</option>
+            {TICKET_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
+        </form>
+        <div className="queue-count">{tickets.length} / {total} 个工单</div>
         <div className="ticket-list">{tickets.map((ticket) => <button key={ticket.id} className={selected?.id === ticket.id ? 'ticket-row active' : 'ticket-row'} onClick={() => setSelectedId(ticket.id)}><div><strong>{ticket.public_code}</strong><span className={`severity ${ticket.severity}`}>{ticket.severity}</span></div><p>{ticket.summary}</p><small>{ticket.status.replace('_', ' ')}</small></button>)}</div>
+        {nextCursor && <button className="ghost queue-more" onClick={() => void loadTickets(true)}>加载更多</button>}
       </aside>
       <main className="ticket-detail">
         {error && <p className="error-banner" role="alert">{error}</p>}

@@ -1,4 +1,4 @@
-import type { AgentResponse, ApiErrorBody, CurrentUser, Ticket, TraceEvent } from './types'
+import type { AgentResponse, ApiErrorBody, CurrentUser, Ticket, TicketStatus, TraceEvent } from './types'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/v1'
 
@@ -108,8 +108,24 @@ function dispatchSseBlock(block: string, callbacks: StreamCallbacks): void {
   }
 }
 
-export const listTickets = (token: string) =>
-  request<{ items: Ticket[]; total: number }>('/tickets?limit=100', token)
+export interface TicketListOptions {
+  status?: TicketStatus
+  q?: string
+  cursor?: string
+  limit?: number
+}
+
+export const listTickets = (token: string, options: TicketListOptions = {}) => {
+  const params = new URLSearchParams()
+  params.set('limit', String(options.limit ?? 20))
+  if (options.status) params.set('status', options.status)
+  if (options.q?.trim()) params.set('q', options.q.trim())
+  if (options.cursor) params.set('cursor', options.cursor)
+  return request<{ items: Ticket[]; total: number; next_cursor: string | null }>(
+    `/tickets?${params.toString()}`,
+    token,
+  )
+}
 
 export const claimTicket = (token: string, ticket: Ticket) =>
   request<Ticket>(`/tickets/${ticket.id}/claim`, token, {
