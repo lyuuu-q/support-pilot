@@ -262,6 +262,31 @@ def resolve_agent_request(
 
 
 @router.post(
+    "/agent/runs/{run_id}/resume",
+    response_model=AgentResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+    },
+    tags=["agent"],
+)
+def resume_agent_run(
+    run_id: UUID,
+    actor: CurrentUserDep,
+    session: SessionDep,
+) -> AgentResponse:
+    embedding_provider, reranker_provider = get_provider_bundle()
+    return AgentService(
+        session,
+        decision_provider=get_decision_provider(),
+        embedding_provider=embedding_provider,
+        reranker_provider=reranker_provider,
+    ).resume_run(run_id, actor=actor)
+
+
+@router.post(
     "/agent/resolve/stream",
     response_class=StreamingResponse,
     responses={

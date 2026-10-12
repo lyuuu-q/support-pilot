@@ -1,11 +1,12 @@
 from collections.abc import Iterator
 from hashlib import sha256
-from typing import Literal, TypeAlias
-from uuid import uuid4
+from typing import Literal, TypeAlias, cast
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from support_pilot.agent.checkpoints import open_checkpointer
 from support_pilot.agent.contracts import (
     AgentContext,
     AgentRequest,
@@ -19,6 +20,7 @@ from support_pilot.domain.errors import (
     AuthorizationError,
     IdempotencyConflictError,
     RequestPreconditionError,
+    ResourceNotFoundError,
 )
 from support_pilot.domain.rules import can_access_tenant
 from support_pilot.domain.sanitization import redact_text, redact_value
@@ -98,13 +100,6 @@ class AgentService:
         )
         self.session.add(run)
         self.session.flush()
-        graph = build_agent_graph(
-            session=self.session,
-            actor=actor,
-            decision_provider=self.decision_provider,
-            embedding_provider=self.embedding_provider,
-            reranker_provider=self.reranker_provider,
-        )
         initial_state: AgentState = {
             "request": resolved_request,
             "resume_intent": (
@@ -116,22 +111,42 @@ class AgentService:
             "stored_ticket_result": conversation.ticket_result,
             "trace": [],
         }
-        try:
-            emitted_trace_events = 0
-            state = initial_state
-            for streamed_state in graph.stream(
-                initial_state,
-                {"recursion_limit": 12},
-                stream_mode="values",
-            ):
-                state = streamed_state
-                trace = state.get("trace", [])
-                for trace_event in trace[emitted_trace_events:]:
-                    yield "progress", trace_event
-                emitted_trace_events = len(trace)
-        except Exception:
-            self._record_unexpected_failure(run=run, trace_id=trace_id)
-            raise
+        with open_checkpointer() as checkpointer:
+            graph = build_agent_graph(
+                session=self.session,
+                actor=actor,
+                decision_provider=self.decision_provider,
+                embedding_provider=self.embedding_provider,
+                reranker_provider=self.reranker_provider,
+                checkpointer=checkpointer,
+            )
+            config: dict[str, object] = {
+                "configurable": {"thread_id": str(run.id)},
+                "recursion_limit": 12,
+            }
+            if checkpointer is not None:
+                self.session.commit()
+            try:
+                emitted_trace_events = 0
+                state = initial_state
+                for streamed_state in graph.stream(
+                    initial_state,
+                    config,
+                    stream_mode="values",
+                ):
+                    state = streamed_state
+                    trace = state.get("trace", [])
+                    for trace_event in trace[emitted_trace_events:]:
+                        yield "progress", trace_event
+                    emitted_trace_events = len(trace)
+                    self._persist_progress(run=run, state=state)
+            except Exception:
+                self._record_unexpected_failure(
+                    run=run,
+                    trace_id=trace_id,
+                    interrupted=checkpointer is not None,
+                )
+                raise
         response = response_from_state(request_id=run.id, trace_id=trace_id, state=state)
         self._update_conversation(
             conversation=conversation,
@@ -143,6 +158,80 @@ class AgentService:
         self._record_success(run=run, response=response)
         self.session.commit()
         yield "result", response
+
+    def resume_run(self, run_id: UUID, *, actor: UserAccount) -> AgentResponse:
+        run = self.session.get(AgentRun, run_id)
+        if run is None or run.user_id != actor.id:
+            raise ResourceNotFoundError("agent run not found")
+        if run.status not in {"running", "interrupted"}:
+            raise RequestPreconditionError("agent run is not resumable")
+        conversation = self.session.scalar(
+            select(AgentConversation).where(
+                AgentConversation.session_id == run.session_id,
+                AgentConversation.user_id == actor.id,
+            )
+        )
+        if conversation is None:
+            raise ResourceNotFoundError("agent conversation not found")
+        with open_checkpointer() as checkpointer:
+            if checkpointer is None:
+                raise RequestPreconditionError("agent checkpointing is disabled")
+            graph = build_agent_graph(
+                session=self.session,
+                actor=actor,
+                decision_provider=self.decision_provider,
+                embedding_provider=self.embedding_provider,
+                reranker_provider=self.reranker_provider,
+                checkpointer=checkpointer,
+            )
+            config: dict[str, object] = {
+                "configurable": {"thread_id": str(run.id)},
+                "recursion_limit": 12,
+            }
+            snapshot = graph.get_state(config)
+            if not snapshot.values:
+                raise RequestPreconditionError("no checkpoint found for this run")
+            state = cast(AgentState, snapshot.values)
+            try:
+                if snapshot.next:
+                    for streamed_state in graph.stream(None, config, stream_mode="values"):
+                        state = cast(AgentState, streamed_state)
+                        self._persist_progress(run=run, state=state)
+                response = response_from_state(
+                    request_id=run.id,
+                    trace_id=run.trace_id,
+                    state=state,
+                )
+            except Exception:
+                self._record_unexpected_failure(
+                    run=run,
+                    trace_id=run.trace_id,
+                    interrupted=True,
+                )
+                raise
+            resolved_request = state["request"]
+            self._update_conversation(
+                conversation=conversation,
+                request=resolved_request,
+                response=response,
+                confirmation_key_hash=conversation.confirmation_key_hash,
+            )
+            response = response.model_copy(
+                update={"conversation_status": conversation.status}
+            )
+            self._record_success(run=run, response=response)
+            self.session.commit()
+            return response
+
+    def _persist_progress(self, *, run: AgentRun, state: AgentState) -> None:
+        trace = state.get("trace", [])
+        run.trace_json = redact_value(trace)
+        run.state_json = {
+            "checkpoint_thread_id": str(run.id),
+            "completed_nodes": len(trace),
+        }
+        self.session.add(run)
+        self.session.commit()
 
     def _get_or_create_conversation(
         self,
@@ -273,9 +362,18 @@ class AgentService:
             conversation.confirmation_key_hash = confirmation_key_hash
         conversation.version += 1
 
-    def _record_unexpected_failure(self, *, run: AgentRun, trace_id: str) -> None:
-        run.status = "failed"
-        run.state_json = {"error": "unexpected_agent_failure"}
+    def _record_unexpected_failure(
+        self,
+        *,
+        run: AgentRun,
+        trace_id: str,
+        interrupted: bool = False,
+    ) -> None:
+        run.status = "interrupted" if interrupted else "failed"
+        run.state_json = {
+            "error": "unexpected_agent_failure",
+            "resumable": interrupted,
+        }
         run.trace_json = []
         self.session.add(
             AuditEvent(

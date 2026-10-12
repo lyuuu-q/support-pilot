@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 from fastapi.testclient import TestClient
 from httpx import Response
 from pytest import MonkeyPatch
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from support_pilot.agent.providers import ProviderConfigurationError
@@ -594,3 +594,106 @@ def test_concurrent_ticket_confirmation_creates_one_ticket(
     ticket_ids = {response.json()["tool_result"]["ticket_id"] for response in responses}
     assert len(ticket_ids) == 1
     assert db_session.scalar(select(func.count()).select_from(Ticket)) == 1
+
+
+
+def test_agent_run_persists_checkpoint_and_can_be_resumed(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    ingest_manifest(
+        db_session,
+        manifest_path=Path("data/knowledge/manifest.json"),
+        embedding_provider=DeterministicEmbeddingProvider(),
+    )
+    response = client.post(
+        "/api/v1/agent/resolve",
+        headers=_headers(db_session),
+        json={
+            "message": "HTTP 429 响应里的 Retry-After 应该如何处理？",
+            "context": {"product_version": "v2"},
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    run_id = payload["request_id"]
+    checkpoint_count = db_session.execute(
+        text("SELECT count(*) FROM checkpoints WHERE thread_id = :thread_id"),
+        {"thread_id": run_id},
+    ).scalar_one()
+    assert checkpoint_count >= 1
+
+    run = db_session.get(AgentRun, UUID(run_id))
+    assert run is not None
+    run.status = "interrupted"
+    db_session.commit()
+
+    resumed = client.post(
+        f"/api/v1/agent/runs/{run_id}/resume",
+        headers=_headers(db_session),
+    )
+    assert resumed.status_code == 200
+    resumed_payload = resumed.json()
+    assert resumed_payload["request_id"] == run_id
+    assert resumed_payload["outcome"] == payload["outcome"]
+
+    repeated = client.post(
+        f"/api/v1/agent/runs/{run_id}/resume",
+        headers=_headers(db_session),
+    )
+    assert repeated.status_code == 400
+    assert repeated.json()["error"]["code"] == "request_precondition_failed"
+
+
+def test_agent_resume_rejects_non_owner_and_missing_checkpoint(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    ingest_manifest(
+        db_session,
+        manifest_path=Path("data/knowledge/manifest.json"),
+        embedding_provider=DeterministicEmbeddingProvider(),
+    )
+    response = client.post(
+        "/api/v1/agent/resolve",
+        headers=_headers(db_session),
+        json={"message": "如何查询限流响应头？"},
+    )
+    payload = response.json()
+    run = db_session.get(AgentRun, UUID(payload["request_id"]))
+    assert run is not None
+    run.status = "interrupted"
+    db_session.commit()
+    other_user = db_session.scalar(
+        select(UserAccount).where(UserAccount.role == "tenant_admin")
+    )
+    assert other_user is not None
+
+    non_owner = client.post(
+        f"/api/v1/agent/runs/{payload['request_id']}/resume",
+        headers={"X-User-Id": str(other_user.id)},
+    )
+    assert non_owner.status_code == 404
+
+    missing = AgentRun(
+        id=uuid4(),
+        session_id=run.session_id,
+        user_id=run.user_id,
+        tenant_id=run.tenant_id,
+        raw_message="interrupted without checkpoint",
+        status="interrupted",
+        provider="deterministic",
+        model="keyword-router-v1",
+        trace_id=uuid4().hex,
+        state_json={},
+        trace_json=[],
+    )
+    db_session.add(missing)
+    db_session.commit()
+
+    no_checkpoint = client.post(
+        f"/api/v1/agent/runs/{missing.id}/resume",
+        headers=_headers(db_session),
+    )
+    assert no_checkpoint.status_code == 400
+    assert no_checkpoint.json()["error"]["code"] == "request_precondition_failed"

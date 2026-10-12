@@ -2,6 +2,7 @@ import operator
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal, TypedDict, cast
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from sqlalchemy.orm import Session
 
@@ -70,6 +71,7 @@ def build_agent_graph(
     decision_provider: DecisionProvider,
     embedding_provider: EmbeddingProvider,
     reranker_provider: RerankerProvider,
+    checkpointer: BaseCheckpointSaver[Any] | None = None,
 ) -> Any:
     def preflight_safety(state: AgentState) -> dict[str, Any]:
         message = state["request"].message
@@ -427,7 +429,7 @@ def build_agent_graph(
         "unknown",
     ):
         builder.add_edge(node, END)
-    return builder.compile()
+    return builder.compile(checkpointer=checkpointer)
 
 
 def response_from_state(*, request_id: Any, trace_id: str, state: AgentState) -> AgentResponse:

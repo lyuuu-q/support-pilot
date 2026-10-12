@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     otel_service_name: str = "support-pilot-api"
     otel_exporter_otlp_endpoint: str = "http://localhost:4318/v1/traces"
     agent_max_attempts: int = Field(default=2, ge=1, le=3)
+    agent_checkpoint_enabled: bool = True
     qwen_api_key: SecretStr | None = Field(
         default=None,
         validation_alias=AliasChoices(
