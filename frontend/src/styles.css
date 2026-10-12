@@ -57,3 +57,12 @@ summary { cursor: pointer; font-size: 13px; font-weight: 700; }
 .detail-card { border-top: 1px solid #cbd3cc; padding: 24px 0; }.detail-card h3 { margin-top: 0; }.detail-card p { line-height: 1.7; }.detail-card pre { padding: 16px; overflow: auto; background: #17221f; color: #d9f2e6; font: 11px/1.6 'DM Mono'; }.transition-list li { display: grid; gap: 5px; margin: 12px 0; }.transition-list span { color: var(--muted); font-size: 12px; }.feedback-form { display: grid; gap: 14px; max-width: 620px; }.check { display: flex; align-items: center; }
 @media (max-width: 1050px) { .workspace-grid { grid-template-columns: 1fr 1fr; }.trace-panel { grid-column: 1 / -1; }.trace-list { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }.trace-list li { display: block; }.trace-list li::before { display: none; } }
 @media (max-width: 760px) { .login-shell, .workspace-grid, .support-layout { grid-template-columns: 1fr; }.login-card { margin: 20px; box-shadow: 8px 8px 0 var(--lime); }.login-copy { padding: 48px 24px; }.login-copy h1 { font-size: 38px; }.topbar { padding: 0 14px; }.brand small, .user-chip small { display: none; }.workspace-grid { padding: 10px; }.trace-panel { grid-column: auto; }.support-layout { display: block; }.queue-panel { max-height: 420px; overflow: auto; }.ticket-detail { padding: 28px 18px; }.field-grid { grid-template-columns: 1fr; } }
+
+.claims { margin-top: 28px; }
+.claim-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.claim-list li { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 13px 14px; border: 1px solid var(--line); background: #f7faf8; }
+.claim-id { color: var(--green); font: 11px 'DM Mono'; padding-top: 2px; }
+.claim-list p { margin: 0; line-height: 1.6; }
+.claim-list code { display: block; margin-top: 6px; color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+.claim-support { color: var(--green); border: 1px solid currentColor; padding: 3px 5px; font: 10px 'DM Mono'; white-space: nowrap; }
+@media (max-width: 760px) { .claim-list li { grid-template-columns: 1fr; } .claim-support { justify-self: start; } }

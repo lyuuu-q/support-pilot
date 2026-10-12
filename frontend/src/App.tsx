@@ -72,6 +72,28 @@ function TraceTimeline({ events }: { events: TraceEvent[] }) {
   )
 }
 
+function ClaimEvidence({ claims }: { claims: AgentResponse['claims'] }) {
+  return (
+    <div className="claims">
+      <h3>逐条主张</h3>
+      <ol className="claim-list" aria-label="逐条主张">
+        {claims.map((claim) => (
+          <li key={claim.claim_id}>
+            <span className="claim-id">{claim.claim_id}</span>
+            <div>
+              <p>{claim.text}</p>
+              <code>引用 {String(claim.citation_index + 1).padStart(2, '0')} · {claim.source_uri}</code>
+            </div>
+            <span className="claim-support" title={`support_score=${claim.verification.support_score}`}>
+              {claim.verification.supported ? '支持' : '未支持'}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
 function CustomerWorkspace({ token }: { token: string }) {
   const [message, setMessage] = useState('HTTP 429 响应里的 Retry-After 应该如何处理？')
   const [featureCode, setFeatureCode] = useState('')
@@ -128,6 +150,7 @@ function CustomerWorkspace({ token }: { token: string }) {
           <div className={`outcome ${result.outcome}`}><span>{result.outcome}</span><strong>{result.intent}</strong></div>
           <p className="answer">{result.message}</p>
           {result.ticket_draft && <div className="ticket-draft"><p className="eyebrow">写操作确认</p><h3>{result.ticket_draft.summary}</h3><p>{result.ticket_draft.description}</p><div className="button-row"><button className="primary" onClick={() => execute('confirm_ticket')} disabled={busy}>确认创建工单</button><button className="ghost" onClick={() => execute('cancel_ticket')} disabled={busy}>取消</button></div></div>}
+          {!!result.claims?.length && <ClaimEvidence claims={result.claims} />}
           {!!result.citations.length && <div className="evidence"><h3>引用证据</h3>{result.citations.map((citation, index) => <article key={citation.chunk_id}><span>{String(index + 1).padStart(2, '0')}</span><div><strong>{citation.title}</strong><p>{citation.excerpt}</p><code>{citation.source_uri}</code></div></article>)}</div>}
           <div className="run-meta"><span>Trace {result.trace_id.slice(0, 10)}</span><span>{result.model_usage.model_calls} model calls</span><span>{result.model_usage.total_tokens} tokens</span></div>
         </>}

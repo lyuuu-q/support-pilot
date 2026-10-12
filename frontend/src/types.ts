@@ -24,6 +24,21 @@ export interface Citation {
   score: number
 }
 
+export interface ClaimVerification {
+  supported: boolean
+  method: 'verbatim' | 'token_overlap' | 'unverified'
+  support_score: number
+  missing_terms: string[]
+}
+
+export interface EvidenceClaim {
+  claim_id: string
+  text: string
+  chunk_id: string
+  source_uri: string
+  citation_index: number
+  verification: ClaimVerification
+}
 export interface TicketDraft {
   summary: string
   description: string
@@ -43,6 +58,7 @@ export interface AgentResponse {
   message: string
   response_mode: string
   citations: Citation[]
+  claims: EvidenceClaim[]
   tool_result: Record<string, unknown> | null
   ticket_draft: TicketDraft | null
   required_fields: string[]

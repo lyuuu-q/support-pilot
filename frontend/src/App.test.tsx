@@ -35,7 +35,7 @@ function jsonResponse(body: unknown): Response {
 function sseResponse(): Response {
   const body = [
     'event: progress\ndata: {"sequence":1,"node":"preflight_safety","status":"succeeded","detail":"safe"}\n\n',
-    'event: result\ndata: {"request_id":"r","session_id":"s","trace_id":"trace-123456789","outcome":"answered","intent":"knowledge","risk_level":"R1","message":"请按 Retry-After 等待后重试。","response_mode":"extractive","citations":[],"tool_result":null,"ticket_draft":null,"required_fields":[],"escalation_reason":null,"conversation_status":"completed","model_usage":{"model_calls":0,"total_tokens":0,"estimated_cost_cny":0},"trace":[]}\n\n',
+    'event: result\ndata: {"request_id":"r","session_id":"s","trace_id":"trace-123456789","outcome":"answered","intent":"knowledge","risk_level":"R1","message":"请按 Retry-After 等待后重试。","response_mode":"extractive","citations":[],"claims":[{"claim_id":"c1-1","text":"客户端应以 Retry-After 为准","chunk_id":"chunk-1","source_uri":"kb://exampleapi/reference/rate-limits","citation_index":0,"verification":{"supported":true,"method":"verbatim","support_score":1.0,"missing_terms":[]}}],"tool_result":null,"ticket_draft":null,"required_fields":[],"escalation_reason":null,"conversation_status":"completed","model_usage":{"model_calls":0,"total_tokens":0,"estimated_cost_cny":0},"trace":[]}\n\n',
   ].join('')
   return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
 }
@@ -61,6 +61,9 @@ describe('SupportPilot console', () => {
 
     expect(await screen.findByText('请按 Retry-After 等待后重试。')).toBeInTheDocument()
     expect(screen.getByText('preflight_safety')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '逐条主张' })).toBeInTheDocument()
+    expect(screen.getByText('客户端应以 Retry-After 为准')).toBeInTheDocument()
+    expect(screen.getByText('支持')).toBeInTheDocument()
   })
 
   it('lets a support agent claim an open handoff ticket', async () => {

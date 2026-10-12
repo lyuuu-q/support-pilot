@@ -16,6 +16,8 @@ test('streams cited guidance before a confirmed ticket reaches human handling', 
   await expect(page.getByText('Alpha Admin（合成用户）')).toBeVisible()
   await page.getByRole('button', { name: '开始诊断' }).click()
   await expect(page.getByRole('heading', { name: '引用证据' })).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByRole('heading', { name: '逐条主张' })).toBeVisible()
+  await expect(page.getByRole('list', { name: '逐条主张' })).toContainText('Retry-After')
   await expect(page.getByRole('list', { name: 'Agent 执行轨迹' })).toContainText('knowledge_search')
 
   await page.locator('textarea').first().fill(`${ticketSummary}，请创建工单并转人工。`)
