@@ -40,6 +40,7 @@ class AgentState(TypedDict, total=False):
     message: str
     response_mode: str
     citations: list[dict[str, Any]]
+    claims: list[dict[str, Any]]
     tool_result: dict[str, Any] | None
     ticket_draft: dict[str, Any] | None
     escalation_reason: str | None
@@ -193,12 +194,14 @@ def build_agent_graph(
                 "knowledge_prompt_injection_detected",
             )
         citations = [hit.citation.model_dump(mode="json") for hit in selected_hits]
+        claims = [claim.model_dump(mode="json") for claim in result.claims]
         answer = "\n\n".join(hit.content for hit in selected_hits)
         return {
             "outcome": "answered",
             "message": answer,
             "response_mode": "extractive",
             "citations": citations,
+            "claims": claims,
             "tool_result": {
                 "tool": "knowledge.search",
                 "answerability_reason": result.decision.reason,
@@ -439,6 +442,7 @@ def response_from_state(*, request_id: Any, trace_id: str, state: AgentState) ->
         message=state["message"],
         response_mode=cast(Any, state.get("response_mode", "none")),
         citations=state.get("citations", []),
+        claims=state.get("claims", []),
         tool_result=state.get("tool_result"),
         ticket_draft=state.get("ticket_draft"),
         required_fields=state.get("required_fields", []),

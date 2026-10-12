@@ -100,3 +100,7 @@ def test_knowledge_search_api_returns_provider_and_evidence(
     payload = response.json()
     assert payload["embedding_provider"] == "deterministic"
     assert payload["hits"][0]["citation"]["source_uri"] == ("kb://exampleapi/reference/rate-limits")
+    assert payload["claims"][0]["source_uri"] == "kb://exampleapi/reference/rate-limits"
+    assert payload["claims"][0]["citation_index"] == 0
+    assert payload["claims"][0]["verification"]["supported"] is True
+    assert payload["claims"][0]["chunk_id"] == payload["hits"][0]["citation"]["chunk_id"]

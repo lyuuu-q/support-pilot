@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -49,6 +49,22 @@ class AnswerabilityDecision(StrictRagContract):
     has_conflict: bool
 
 
+class ClaimVerification(StrictRagContract):
+    supported: bool
+    method: Literal["verbatim", "token_overlap", "unverified"]
+    support_score: float = Field(ge=0.0, le=1.0)
+    missing_terms: list[str] = Field(default_factory=list)
+
+
+class EvidenceClaim(StrictRagContract):
+    claim_id: str = Field(min_length=1, max_length=50)
+    text: str = Field(min_length=1, max_length=1_000)
+    chunk_id: UUID
+    source_uri: str
+    citation_index: int = Field(ge=0)
+    verification: ClaimVerification
+
+
 class KnowledgeSearchResponse(StrictRagContract):
     query: str
     embedding_provider: str
@@ -57,4 +73,5 @@ class KnowledgeSearchResponse(StrictRagContract):
     reranker_model: str
     filters_applied: RetrievalFilters
     decision: AnswerabilityDecision
+    claims: list[EvidenceClaim] = Field(default_factory=list)
     hits: list[RetrievalHit]

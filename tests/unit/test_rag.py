@@ -2,6 +2,7 @@ import importlib.util
 import json
 import math
 import sys
+from dataclasses import replace
 from pathlib import Path
 from uuid import UUID
 
@@ -161,3 +162,39 @@ def test_retrieval_evaluation_defaults_to_holdout_set(
     args = module.parse_args()
 
     assert args.dataset == Path("data/evaluation/retrieval_test_cases.json")
+
+
+def test_controlled_multi_evidence_expands_same_answer_version() -> None:
+    service = object.__new__(HybridRetrievalService)
+    service.answerability_threshold = 0.28
+    first = _row(1)
+    second = replace(_row(2), document_id=first.document_id)
+    candidates = [
+        FusedCandidate(row=first, rerank_score=0.8),
+        FusedCandidate(row=second, rerank_score=0.6),
+    ]
+    decision = service._answerability(candidates)
+
+    updated, selected = service._controlled_multi_evidence(candidates, decision)
+
+    assert updated.answerable
+    assert updated.evidence_count == 2
+    assert [candidate.row.chunk_id for candidate in selected] == [
+        first.chunk_id,
+        second.chunk_id,
+    ]
+
+
+def test_controlled_multi_evidence_falls_back_without_same_group() -> None:
+    service = object.__new__(HybridRetrievalService)
+    service.answerability_threshold = 0.28
+    candidates = [
+        FusedCandidate(row=_row(1, topic="one"), rerank_score=0.8),
+        FusedCandidate(row=_row(2, topic="two"), rerank_score=0.6),
+    ]
+    decision = service._answerability(candidates)
+
+    _updated, selected = service._controlled_multi_evidence(candidates, decision)
+
+    assert len(selected) == 1
+    assert selected[0].row.chunk_id == candidates[0].row.chunk_id

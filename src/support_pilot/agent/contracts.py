@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from support_pilot.domain.enums import EscalationReason, TicketCategory, TicketSeverity
-from support_pilot.rag.contracts import Citation
+from support_pilot.rag.contracts import Citation, EvidenceClaim
 
 AgentIntent = Literal[
     "knowledge",
@@ -105,6 +105,7 @@ class AgentResponse(StrictAgentContract):
     message: str
     response_mode: Literal["extractive", "deterministic", "none"]
     citations: list[Citation] = Field(default_factory=list)
+    claims: list[EvidenceClaim] = Field(default_factory=list)
     tool_result: dict[str, Any] | None = None
     ticket_draft: TicketDraft | None = None
     required_fields: list[str] = Field(default_factory=list)

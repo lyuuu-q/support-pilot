@@ -75,6 +75,8 @@ def test_agent_answers_knowledge_with_citations_and_persists_trace(
     assert payload["intent"] == "knowledge"
     assert payload["response_mode"] == "extractive"
     assert payload["citations"][0]["source_uri"] == "kb://exampleapi/reference/rate-limits"
+    assert payload["claims"][0]["source_uri"] == "kb://exampleapi/reference/rate-limits"
+    assert payload["claims"][0]["verification"]["supported"] is True
     run = db_session.scalar(select(AgentRun).where(AgentRun.id == payload["request_id"]))
     assert run is not None
     db_session.refresh(run)
@@ -115,6 +117,7 @@ def test_agent_combines_same_topic_chunks_for_multi_evidence_answer(
         "403 Forbidden",
     ]
     assert payload["tool_result"]["evidence_count"] == 2
+    assert {claim["citation_index"] for claim in payload["claims"]} == {0, 1}
 
 
 def test_agent_rejects_prompt_injection_in_any_selected_evidence(

@@ -10,6 +10,7 @@ from support_pilot.rag.contracts import (
     KnowledgeSearchResponse,
     RetrievalHit,
 )
+from support_pilot.rag.faithfulness import build_evidence_claims
 from support_pilot.rag.providers.base import EmbeddingProvider, RerankerProvider
 from support_pilot.rag.repository import KnowledgeRepository, SearchRow
 
@@ -94,13 +95,17 @@ class HybridRetrievalService:
         )[: request.top_k]
         decision = self._answerability(reranked)
         selected = reranked[:1] if decision.answerable else []
-        if decision.reason == "insufficient_relevance":
+        if decision.reason == "sufficient_evidence":
+            decision, selected = self._controlled_multi_evidence(reranked, decision)
+        elif decision.reason == "insufficient_relevance":
             multi_decision, selected = self._multi_evidence_answerability(
                 request.query,
                 reranked,
             )
             if multi_decision is not None:
                 decision = multi_decision
+        selected_hits = [self._to_hit(candidate) for candidate in selected]
+        claims = build_evidence_claims(selected_hits)
         selected_ids = {candidate.row.chunk_id for candidate in selected}
         ordered = selected + [
             candidate for candidate in reranked if candidate.row.chunk_id not in selected_ids
@@ -113,7 +118,54 @@ class HybridRetrievalService:
             reranker_model=self.reranker_provider.model_name,
             filters_applied=request.filters,
             decision=decision,
+            claims=claims,
             hits=[self._to_hit(candidate) for candidate in ordered],
+        )
+
+    def _controlled_multi_evidence(
+        self,
+        candidates: list[FusedCandidate],
+        decision: AnswerabilityDecision,
+    ) -> tuple[AnswerabilityDecision, list[FusedCandidate]]:
+        relevant = [
+            candidate
+            for candidate in candidates
+            if candidate.rerank_score >= self.answerability_threshold
+        ]
+        grouped: dict[tuple[UUID, str, str], list[FusedCandidate]] = {}
+        for candidate in relevant:
+            topic = candidate.row.metadata.get("topic_code")
+            answer = candidate.row.metadata.get("answer_key")
+            if isinstance(topic, str) and isinstance(answer, str):
+                grouped.setdefault((candidate.row.document_id, topic, answer), []).append(candidate)
+        groups = [group for group in grouped.values() if len(group) >= 2]
+        if not groups:
+            return decision, candidates[:1]
+        groups.sort(
+            key=lambda group: (
+                -max(candidate.rerank_score for candidate in group),
+                str(group[0].row.chunk_id),
+            )
+        )
+        selected = sorted(
+            groups[0],
+            key=lambda candidate: (
+                -candidate.rerank_score,
+                -candidate.rrf_score,
+                str(candidate.row.chunk_id),
+            ),
+        )[:3]
+        if not selected or self._has_conflict(selected):
+            return decision, candidates[:1]
+        return (
+            AnswerabilityDecision(
+                answerable=True,
+                reason="sufficient_evidence",
+                evidence_count=len(selected),
+                top_score=max(candidate.rerank_score for candidate in selected),
+                has_conflict=False,
+            ),
+            selected,
         )
 
     def _answerability(self, candidates: list[FusedCandidate]) -> AnswerabilityDecision:
