@@ -132,6 +132,14 @@ uv run python scripts/evaluate_retrieval.py --provider local_bge
 
 默认检索评测使用冻结后独立 holdout；原 60 条同源数据仅作 calibration 和回归。完整指标、混淆矩阵与限制见[ RAG 离线评测](./docs/evaluation/stage-3-rag-evaluation.md)。
 
+claim 级引用与忠实度评测使用独立 faithfulness v2 数据集和确定性 verifier：
+
+```powershell
+uv run python scripts/evaluate_faithfulness.py
+```
+
+完整指标和失败样本见[第九阶段忠实度评测](./docs/evaluation/stage-9-faithfulness-evaluation.md)。
+
 可通过 `SUPPORT_PILOT_MODEL_CACHE_DIR` 覆盖模型目录。真实模型首次下载和 CPU 重排较慢；确定性 Provider 只用于 CI 和流程回归。
 
 ## 工单通知与验证边界
@@ -140,7 +148,7 @@ uv run python scripts/evaluate_retrieval.py --provider local_bge
 
 SMTP 密码与 Webhook URL 使用 `SecretStr` 保存；认证 SMTP 强制启用证书和主机名校验，Webhook 强制 HTTPS、显式主机白名单并拒绝非公网 IP 与环境代理。自动化测试只使用 Mock/Fake 外部边界，不代表真实邮件或群机器人已经完成线上投递验证。
 
-当前验证结果为 101 项后端测试（覆盖率 93%）通过；4 项前端单元测试和 1 条 Chromium 业务 E2E 为上一次全栈验收证据，待本分支 CI 再次确认。Alembic upgrade/check 已通过。浏览器 E2E 使用确定性 Provider、隔离的 `support_pilot_test` 数据库和 `log` 通知通道，不会调用付费模型或外部通知服务。
+当前验证结果为 113 项后端测试（覆盖率 93%）通过；4 项前端单元测试和 1 条 Chromium 业务 E2E 已在本机复跑通过；80 场景 deterministic Agent 评测 80/80；faithfulness v2 的 claim support rate 为 1.000、false answer rate 为 0.000、claim coverage 为 0.8333。Alembic upgrade/check 已通过。浏览器 E2E 使用确定性 Provider、隔离的 `support_pilot_test` 数据库和 `log` 通知通道，不会调用付费模型或外部通知服务。
 
 ## 验证
 
@@ -202,3 +210,7 @@ npm run test:e2e
 - [项目复盘](./docs/retrospectives/project-retrospective.md)
 - [指标口径与证据索引](./docs/evaluation/metrics-and-claims.md)
 - [技术讲解与设计问答](./docs/architecture/technical-guide.md)
+- [第九阶段验收](./docs/product/stage-9-acceptance.md)
+- [claim 级引用与忠实度 ADR](./docs/adr/0008-claim-level-citations-and-faithfulness-verification.md)
+- [第九阶段忠实度评测](./docs/evaluation/stage-9-faithfulness-evaluation.md)
+- [第九阶段学习说明](./docs/learning/stage-9-evidence-faithfulness.md)
