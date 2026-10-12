@@ -1,19 +1,11 @@
 import math
-import re
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from hashlib import sha256
 
-TOKEN_PATTERN = re.compile(r"[a-z0-9_./:-]+|[\u4e00-\u9fff]", re.IGNORECASE)
-TECHNICAL_FEATURE_PATTERN = re.compile(r"^[a-z0-9_./:-]+$", re.IGNORECASE)
-
-
-def lexical_features(text: str) -> list[str]:
-    normalized = text.lower()
-    tokens = TOKEN_PATTERN.findall(normalized)
-    chinese = "".join(token for token in tokens if "\u4e00" <= token <= "\u9fff")
-    bigrams = [chinese[index : index + 2] for index in range(max(len(chinese) - 1, 0))]
-    return tokens + bigrams
+from support_pilot.rag.text import feature_weight as feature_weight
+from support_pilot.rag.text import lexical_features as lexical_features
+from support_pilot.rag.text import weighted_coverage as weighted_coverage
 
 
 class DeterministicEmbeddingProvider:
@@ -47,23 +39,7 @@ class DeterministicRerankerProvider:
 
     def score(self, query: str, documents: Sequence[str]) -> list[float]:
         query_features = set(lexical_features(query))
-        return [self._overlap(query_features, lexical_features(document)) for document in documents]
-
-    @staticmethod
-    def _overlap(query_features: set[str], document_features: Iterable[str]) -> float:
-        if not query_features:
-            return 0.0
-        document_set = set(document_features)
-        denominator = sum(_feature_weight(feature) for feature in query_features)
-        matched = sum(
-            _feature_weight(feature) for feature in query_features if feature in document_set
-        )
-        return matched / denominator if denominator else 0.0
-
-
-def _feature_weight(feature: str) -> float:
-    if TECHNICAL_FEATURE_PATTERN.fullmatch(feature):
-        return 3.0
-    if len(feature) == 2:
-        return 1.5
-    return 0.25
+        return [
+            weighted_coverage(query_features, set(lexical_features(document)))
+            for document in documents
+        ]
