@@ -207,6 +207,27 @@ def test_agent_stream_emits_real_node_progress_before_final_result(
     assert result["tool_result"]["enabled"] is True  # type: ignore[index]
 
 
+def test_agent_stream_assigns_monotonic_event_ids(client: TestClient, db_session: Session) -> None:
+    session_id = UUID("70000000-0000-0000-0000-000000000001")
+    response = client.post(
+        "/api/v1/agent/resolve/stream",
+        headers=_headers(db_session),
+        json={
+            "session_id": str(session_id),
+            "message": "我的批量导出功能开通了吗？",
+            "context": {"feature_code": "bulk_export"},
+        },
+    )
+
+    assert response.status_code == 200
+    event_ids = [
+        line.removeprefix("id: ")
+        for line in response.text.splitlines()
+        if line.startswith("id: ")
+    ]
+    assert event_ids == [f"{session_id}:{index}" for index in range(1, len(event_ids) + 1)]
+    assert len(event_ids) == 5
+
 def test_agent_stream_returns_controlled_error_event_for_invalid_confirmation(
     client: TestClient, db_session: Session
 ) -> None:

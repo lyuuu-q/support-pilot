@@ -35,10 +35,11 @@ from support_pilot.tickets.service import TicketWorkflowService
 router = APIRouter(prefix="/api/v1")
 
 
-def _sse_event(event: str, payload: Any) -> str:
+def _sse_event(event: str, payload: Any, *, event_id: str | None = None) -> str:
     if hasattr(payload, "model_dump"):
         payload = payload.model_dump(mode="json")
-    return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+    id_line = f"id: {event_id}\n" if event_id is not None else ""
+    return f"{id_line}event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
 @router.post(
@@ -286,19 +287,28 @@ def stream_agent_request(
     )
 
     def event_stream() -> Iterator[str]:
+        sequence = 0
         try:
             for event_name, payload in service.resolve_events(
                 request,
                 actor=actor,
                 idempotency_key=idempotency_key,
             ):
-                yield _sse_event(event_name, payload)
+                sequence += 1
+                yield _sse_event(
+                    event_name,
+                    payload,
+                    event_id=f"{request.session_id}:{sequence}",
+                )
         except DomainError as error:
+            sequence += 1
             yield _sse_event(
                 "error",
                 {"error": {"code": error.code, "message": str(error)}},
+                event_id=f"{request.session_id}:{sequence}",
             )
         except Exception:
+            sequence += 1
             yield _sse_event(
                 "error",
                 {
@@ -307,6 +317,7 @@ def stream_agent_request(
                         "message": "Agent execution failed; retry or request human support.",
                     }
                 },
+                event_id=f"{request.session_id}:{sequence}",
             )
 
     return StreamingResponse(
