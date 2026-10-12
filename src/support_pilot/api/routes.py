@@ -70,15 +70,19 @@ def list_tickets(
     session: SessionDep,
     tenant_id: UUID | None = None,
     status: TicketStatus | None = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    q: Annotated[str | None, Query(min_length=1, max_length=100)] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
+    cursor: Annotated[str | None, Query(min_length=1, max_length=500)] = None,
 ) -> TicketListResponse:
     return TicketWorkflowService(session).list_tickets(
         actor=actor,
         tenant_id=tenant_id,
         status=status,
+        q=q,
         limit=limit,
         offset=offset,
+        cursor=cursor,
     )
 
 

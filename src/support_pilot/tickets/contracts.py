@@ -48,6 +48,7 @@ class TicketResponse(StrictTicketContract):
 class TicketListResponse(StrictTicketContract):
     items: list[TicketResponse]
     total: int
+    next_cursor: str | None = None
 
 
 class ClaimTicketRequest(StrictTicketContract):

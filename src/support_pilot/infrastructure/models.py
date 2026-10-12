@@ -371,6 +371,8 @@ class AgentConversation(Base, TimestampMixin):
 class Ticket(Base, TimestampMixin):
     __tablename__ = "tickets"
     __table_args__ = (
+        Index("ix_tickets_created_at_id", "created_at", "id"),
+        Index("ix_tickets_status_created_at_id", "status", "created_at", "id"),
         CheckConstraint(
             "status IN ('open', 'triaged', 'in_progress', 'waiting_customer', "
             "'resolved', 'closed')",

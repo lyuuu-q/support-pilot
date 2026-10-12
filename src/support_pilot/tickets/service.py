@@ -1,9 +1,12 @@
+import base64
+import binascii
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, NoReturn
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from support_pilot.domain.enums import AuditOutcome, IdempotencyStatus, TicketStatus, UserRole
@@ -63,8 +66,10 @@ class TicketWorkflowService:
         actor: UserAccount,
         tenant_id: UUID | None,
         status: TicketStatus | None,
+        q: str | None,
         limit: int,
         offset: int,
+        cursor: str | None,
     ) -> TicketListResponse:
         role = UserRole(actor.role)
         if tenant_id is not None and not can_access_tenant(
@@ -96,19 +101,46 @@ class TicketWorkflowService:
             filters.append(Ticket.tenant_id == tenant_id)
         if status is not None:
             filters.append(Ticket.status == status.value)
+        normalized_query = (q or "").strip()
+        if normalized_query:
+            escaped = (
+                normalized_query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            )
+            pattern = f"%{escaped}%"
+            filters.append(
+                or_(
+                    Ticket.public_code.ilike(pattern, escape="\\"),
+                    Ticket.summary.ilike(pattern, escape="\\"),
+                    Ticket.description.ilike(pattern, escape="\\"),
+                )
+            )
+        if cursor is not None and offset:
+            raise RequestPreconditionError("offset cannot be combined with cursor")
+        if cursor is not None:
+            cursor_created_at, cursor_id = self._decode_ticket_cursor(cursor)
+            filters.append(
+                or_(
+                    Ticket.created_at < cursor_created_at,
+                    and_(Ticket.created_at == cursor_created_at, Ticket.id < cursor_id),
+                )
+            )
         statement = (
             select(Ticket)
             .where(*filters)
-            .order_by(Ticket.created_at.desc(), Ticket.id)
-            .limit(limit)
-            .offset(offset)
+            .order_by(Ticket.created_at.desc(), Ticket.id.desc())
+            .limit(limit + 1)
         )
+        if cursor is None and offset:
+            statement = statement.offset(offset)
         count_statement = select(func.count()).select_from(Ticket).where(*filters)
-        tickets = list(self.session.scalars(statement))
+        rows = list(self.session.scalars(statement))
+        has_more = len(rows) > limit
+        tickets = rows[:limit]
         total = self.session.scalar(count_statement) or 0
         return TicketListResponse(
             items=[self._ticket_response(item) for item in tickets],
             total=total,
+            next_cursor=self._encode_ticket_cursor(tickets[-1]) if has_more and tickets else None,
         )
 
     def get_ticket(self, ticket_id: UUID, *, actor: UserAccount) -> TicketResponse:
@@ -554,6 +586,34 @@ class TicketWorkflowService:
                 trace_id=uuid4().hex,
             )
         )
+
+    @staticmethod
+    def _encode_ticket_cursor(ticket: Ticket) -> str:
+        payload = json.dumps(
+            {"created_at": ticket.created_at.isoformat(), "id": str(ticket.id)},
+            separators=(",", ":"),
+        )
+        return base64.urlsafe_b64encode(payload.encode("utf-8")).decode("ascii").rstrip("=")
+
+    @staticmethod
+    def _decode_ticket_cursor(cursor: str) -> tuple[datetime, UUID]:
+        try:
+            padded = cursor + "=" * (-len(cursor) % 4)
+            payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8"))
+            created_at = datetime.fromisoformat(payload["created_at"])
+            ticket_id = UUID(payload["id"])
+        except (
+            binascii.Error,
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            UnicodeError,
+            ValueError,
+        ) as error:
+            raise RequestPreconditionError("invalid ticket cursor") from error
+        if created_at.tzinfo is None or created_at.utcoffset() is None:
+            raise RequestPreconditionError("invalid ticket cursor")
+        return created_at, ticket_id
 
     def _ticket_response(self, ticket: Ticket, *, replayed: bool = False) -> TicketResponse:
         source_request = self.session.get(SupportRequestRecord, ticket.source_request_id)

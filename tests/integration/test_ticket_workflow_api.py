@@ -231,3 +231,58 @@ def test_concurrent_claim_with_same_key_has_one_transition(client: TestClient) -
     assert [response.status_code for response in responses] == [200, 200]
     assert {response.json()["version"] for response in responses} == {2}
     assert sum(response.json()["replayed"] for response in responses) == 1
+
+
+def test_ticket_queue_supports_cursor_search_and_status_filter(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    customer_token = _token(client, "beta.developer@example.com")
+    support_token = _token(client, "support.agent@example.com")
+    created_ids = {_create_agent_ticket(client, customer_token)[0] for _ in range(3)}
+    headers = _bearer(support_token)
+
+    first_page = client.get("/api/v1/tickets?limit=2", headers=headers)
+    assert first_page.status_code == 200
+    first_payload = first_page.json()
+    assert first_payload["total"] == 3
+    assert len(first_payload["items"]) == 2
+    assert first_payload["next_cursor"]
+
+    second_page = client.get(
+        f"/api/v1/tickets?limit=2&cursor={first_payload['next_cursor']}",
+        headers=headers,
+    )
+    second_payload = second_page.json()
+    assert second_page.status_code == 200
+    paged_ids = {item["id"] for item in first_payload["items"]} | {
+        item["id"] for item in second_payload["items"]
+    }
+    assert paged_ids == created_ids
+    assert second_payload["next_cursor"] is None
+
+    searched_code = first_payload["items"][0]["public_code"]
+    searched = client.get(f"/api/v1/tickets?q={searched_code}", headers=headers)
+    assert searched.status_code == 200
+    assert searched.json()["total"] == 1
+    assert searched.json()["items"][0]["public_code"] == searched_code
+
+    target = first_payload["items"][0]
+    claimed = client.post(
+        f"/api/v1/tickets/{target['id']}/claim",
+        headers=_bearer(support_token, idempotency_key="page-claim"),
+        json={"expected_version": target["version"]},
+    )
+    assert claimed.status_code == 200
+    open_tickets = client.get("/api/v1/tickets?status=open", headers=headers)
+    triaged_tickets = client.get("/api/v1/tickets?status=triaged", headers=headers)
+    assert all(item["status"] == "open" for item in open_tickets.json()["items"])
+    assert [item["id"] for item in triaged_tickets.json()["items"]] == [target["id"]]
+
+    invalid_cursor = client.get("/api/v1/tickets?cursor=not-a-cursor", headers=headers)
+    conflicting = client.get(
+        f"/api/v1/tickets?cursor={first_payload['next_cursor']}&offset=1",
+        headers=headers,
+    )
+    assert invalid_cursor.status_code == 400
+    assert conflicting.status_code == 400
