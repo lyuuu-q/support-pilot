@@ -15,6 +15,30 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
+CHECKPOINT_TABLE_NAMES = {
+    "checkpoints",
+    "checkpoint_blobs",
+    "checkpoint_writes",
+    "checkpoint_migrations",
+}
+
+
+def include_object(
+    object: object,
+    name: str | None,
+    type_: str,
+    reflected: bool,
+    compare_to: object,
+) -> bool:
+    if type_ == "table" and name in CHECKPOINT_TABLE_NAMES:
+        return False
+    table = getattr(object, "table", None)
+    return not (
+        type_ == "index" and getattr(table, "name", None) in CHECKPOINT_TABLE_NAMES
+    )
+
+
+
 
 def run_migrations_offline() -> None:
     context.configure(
@@ -23,6 +47,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -39,6 +64,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
+        include_object=include_object,
         )
         with context.begin_transaction():
             context.run_migrations()
