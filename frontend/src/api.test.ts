@@ -27,6 +27,26 @@ describe('streamAgent', () => {
     expect(result).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'answered' }))
   })
 
+  it('forwards AbortSignal to fetch', async () => {
+    const controller = new AbortController()
+    const fetchMock = vi.fn().mockResolvedValue(
+      streamResponse(['event: result\ndata: {"outcome":"answered"}\n\n']),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await streamAgent(
+      'token',
+      { message: 'hello' },
+      { onProgress: vi.fn(), onResult: vi.fn() },
+      undefined,
+      controller.signal,
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ signal: controller.signal }),
+    )
+  })
   it('raises controlled SSE errors', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(streamResponse([
       'event: error\ndata: {"error":{"code":"request_precondition_failed","message":"missing draft"}}\n\n',

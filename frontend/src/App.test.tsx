@@ -66,6 +66,39 @@ describe('SupportPilot console', () => {
     expect(screen.getByText('支持')).toBeInTheDocument()
   })
 
+  it('stops waiting and safely retries the last action', async () => {
+    localStorage.setItem('support-pilot-token', 'customer-token')
+    let streamCalls = 0
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('/auth/me')) return jsonResponse(customer)
+      if (url.endsWith('/agent/resolve/stream')) {
+        streamCalls += 1
+        if (streamCalls === 1) {
+          return new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(new DOMException('aborted', 'AbortError'))
+            })
+          })
+        }
+        return sseResponse()
+      }
+      throw new Error(`unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    await screen.findByText('Alpha Admin')
+    await userEvent.click(screen.getByRole('button', { name: '开始诊断' }))
+    await userEvent.click(await screen.findByRole('button', { name: '停止等待' }))
+
+    expect(await screen.findByRole('button', { name: '重试上一步' })).toBeInTheDocument()
+    expect(screen.getByText(/已停止等待/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '重试上一步' }))
+    expect(await screen.findByText('请按 Retry-After 等待后重试。')).toBeInTheDocument()
+    expect(streamCalls).toBe(2)
+  })
   it('lets a support agent claim an open handoff ticket', async () => {
     localStorage.setItem('support-pilot-token', 'support-token')
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {

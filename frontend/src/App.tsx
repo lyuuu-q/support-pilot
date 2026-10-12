@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ApiError,
   claimTicket,
@@ -103,11 +103,27 @@ function CustomerWorkspace({ token }: { token: string }) {
   const [result, setResult] = useState<AgentResponse | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [stopped, setStopped] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
+  const confirmationKeyRef = useRef<string | null>(null)
+  const lastActionRef = useRef<'confirm_ticket' | 'cancel_ticket' | undefined>(undefined)
 
   async function execute(confirmation?: 'confirm_ticket' | 'cancel_ticket') {
     setBusy(true)
+    setStopped(false)
     setError('')
     setTrace([])
+    lastActionRef.current = confirmation
+    const controller = new AbortController()
+    abortRef.current = controller
+    const idempotencyKey = confirmation === 'confirm_ticket'
+      ? (confirmationKeyRef.current ?? crypto.randomUUID())
+      : undefined
+    if (confirmation === 'confirm_ticket') {
+      confirmationKeyRef.current = idempotencyKey ?? null
+    } else {
+      confirmationKeyRef.current = null
+    }
     const payload: Record<string, unknown> = {
       session_id: sessionId,
       message: confirmation ? (confirmation === 'confirm_ticket' ? '确认创建工单' : '取消创建工单') : message,
@@ -120,13 +136,30 @@ function CustomerWorkspace({ token }: { token: string }) {
     try {
       await streamAgent(token, payload, {
         onProgress: (event) => setTrace((current) => [...current, event]),
-        onResult: setResult,
-      }, confirmation === 'confirm_ticket' ? crypto.randomUUID() : undefined)
+        onResult: (response) => {
+          setResult(response)
+          confirmationKeyRef.current = null
+        },
+      }, idempotencyKey, controller.signal)
     } catch (caught) {
-      setError(messageFrom(caught))
+      if (caught instanceof DOMException && caught.name === 'AbortError') {
+        setStopped(true)
+        setError('已停止等待。服务器可能已经完成本次运行；重试确认会复用同一幂等键。')
+      } else {
+        setError(messageFrom(caught))
+      }
     } finally {
+      abortRef.current = null
       setBusy(false)
     }
+  }
+
+  function stop() {
+    abortRef.current?.abort()
+  }
+
+  function retry() {
+    void execute(lastActionRef.current)
   }
 
   return (
@@ -139,7 +172,11 @@ function CustomerWorkspace({ token }: { token: string }) {
           <label>功能编码<input value={featureCode} onChange={(event) => setFeatureCode(event.target.value)} placeholder="bulk_export" /></label>
           <label>指标编码<input value={metricCode} onChange={(event) => setMetricCode(event.target.value)} placeholder="api_calls" /></label>
         </div></details>
-        <button className="primary" onClick={() => execute()} disabled={busy || message.length < 2}>{busy ? 'Agent 正在诊断…' : '开始诊断'}</button>
+        <div className="button-row">
+          <button className="primary" onClick={() => execute()} disabled={busy || message.length < 2}>{busy ? 'Agent 正在诊断…' : '开始诊断'}</button>
+          {busy && <button className="ghost" onClick={stop}>停止等待</button>}
+          {!busy && stopped && <button className="ghost" onClick={retry}>重试上一步</button>}
+        </div>
         {error && <p className="error-banner" role="alert">{error}</p>}
         <div className="session-note">Session · {sessionId.slice(0, 8)}</div>
       </section>

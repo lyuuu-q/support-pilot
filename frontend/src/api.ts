@@ -61,6 +61,7 @@ export async function streamAgent(
   payload: Record<string, unknown>,
   callbacks: StreamCallbacks,
   idempotencyKey?: string,
+  signal?: AbortSignal,
 ): Promise<void> {
   const response = await fetch(`${API_BASE}/agent/resolve/stream`, {
     method: 'POST',
@@ -71,6 +72,7 @@ export async function streamAgent(
       ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
     },
     body: JSON.stringify(payload),
+    signal,
   })
   if (!response.ok) throw await parseError(response)
   if (!response.body) throw new ApiError('浏览器没有收到事件流', 'stream_unavailable', 0)
