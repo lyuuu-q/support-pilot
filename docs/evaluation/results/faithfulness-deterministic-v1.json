@@ -1,0 +1,85 @@
+{
+  "answerable_count": 8,
+  "data_origin": "human_labeled_synthetic",
+  "dataset": "data\\evaluation\\faithfulness_v2_cases.json",
+  "dataset_version": "faithfulness-v2",
+  "embedding_model": "hash-lexical-v1",
+  "embedding_provider": "deterministic",
+  "evaluated_at": "2026-10-12T13:04:33.191181+00:00",
+  "failure_count": 3,
+  "failures": [
+    {
+      "coverage": 0.6667,
+      "id": "faith-signature-body",
+      "kind": "claim_coverage",
+      "missing_claims": [
+        {
+          "required_terms": "request body",
+          "source_uri": "kb://exampleapi/guides/webhook-signatures",
+          "text": "签名输入是原始 HTTP request body 字节"
+        }
+      ],
+      "presented_claims": [
+        "使用 endpoint secret 对原始 body 计算 HMAC-SHA256，再用常量时间比较函数核对签名",
+        "必须先验证签名再解析或处理事件",
+        "endpoint secret 不得进入日志、工单或向量库"
+      ],
+      "query": "Webhook 签名为什么必须基于原始请求体，并且应使用什么比较方式？",
+      "retrieved_sources": [
+        "kb://exampleapi/guides/webhook-signatures"
+      ]
+    },
+    {
+      "coverage": 0.5,
+      "id": "faith-pagination-cursor",
+      "kind": "claim_coverage",
+      "missing_claims": [
+        {
+          "required_terms": "cursor, 不透明",
+          "source_uri": "kb://exampleapi/reference/pagination",
+          "text": "cursor 是不透明字符串"
+        }
+      ],
+      "presented_claims": [
+        "响应中的 `next_cursor` 非空时才存在下一页",
+        "下一次请求必须保持相同过滤和排序参数，否则 cursor 会失效并返回 400"
+      ],
+      "query": "使用 next_cursor 翻页时，为什么必须保持相同过滤和排序参数？",
+      "retrieved_sources": [
+        "kb://exampleapi/reference/pagination"
+      ]
+    },
+    {
+      "coverage": 0.5,
+      "id": "faith-region-endpoint",
+      "kind": "claim_coverage",
+      "missing_claims": [
+        {
+          "required_terms": "ap-southeast-1",
+          "source_uri": "kb://exampleapi/reference/regions",
+          "text": "新加坡区域使用 https://ap-southeast-1.api.example.invalid"
+        }
+      ],
+      "presented_claims": [
+        "报告延迟或超时时必须提供实际 endpoint、区域和时间",
+        "查询事故时以请求命中的区域为准，不能只使用用户所在地推断"
+      ],
+      "query": "新加坡租户报告高延迟时，应提供哪个实际 endpoint，能否按用户所在地推断区域？",
+      "retrieved_sources": [
+        "kb://exampleapi/reference/regions"
+      ]
+    }
+  ],
+  "k": 5,
+  "metrics": {
+    "citation_precision": 1.0,
+    "claim_coverage": 0.8333,
+    "claim_support_rate": 1.0,
+    "false_answer_rate": 0.0,
+    "unsupported_claim_rate": 0.0
+  },
+  "negative_count": 4,
+  "reranker_model": "weighted-token-overlap-v2",
+  "reranker_provider": "deterministic",
+  "sample_count": 12
+}

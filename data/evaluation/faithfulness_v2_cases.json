@@ -1,0 +1,114 @@
+[
+  {
+    "id": "faith-rate-429",
+    "query": "短时间内连续收到 429 时，客户端应根据哪个响应头等待，是否可以立即并发重试？",
+    "product_version": "v2",
+    "relevant_sources": ["kb://exampleapi/reference/rate-limits"],
+    "required_claims": [
+      {"text": "HTTP 429 表示短期限流", "source_uri": "kb://exampleapi/reference/rate-limits", "required_terms": ["429", "短期限流"]},
+      {"text": "客户端应以 Retry-After 为准", "source_uri": "kb://exampleapi/reference/rate-limits", "required_terms": ["Retry-After"]},
+      {"text": "不要立即并发重试", "source_uri": "kb://exampleapi/reference/rate-limits", "required_terms": ["并发重试"]}
+    ]
+  },
+  {
+    "id": "faith-signature-body",
+    "query": "Webhook 签名为什么必须基于原始请求体，并且应使用什么比较方式？",
+    "product_version": "v2",
+    "relevant_sources": ["kb://exampleapi/guides/webhook-signatures"],
+    "required_claims": [
+      {"text": "签名输入是原始 HTTP request body 字节", "source_uri": "kb://exampleapi/guides/webhook-signatures", "required_terms": ["request body"]},
+      {"text": "使用 HMAC-SHA256", "source_uri": "kb://exampleapi/guides/webhook-signatures", "required_terms": ["HMAC-SHA256"]},
+      {"text": "使用常量时间比较函数核对签名", "source_uri": "kb://exampleapi/guides/webhook-signatures", "required_terms": ["常量时间"]}
+    ]
+  },
+  {
+    "id": "faith-idempotency-payload",
+    "query": "同一个 Idempotency-Key 第二次请求修改了载荷时会返回什么？",
+    "product_version": "v2",
+    "relevant_sources": ["kb://exampleapi/reference/idempotency"],
+    "required_claims": [
+      {"text": "相同键但载荷 hash 不同返回 HTTP 409", "source_uri": "kb://exampleapi/reference/idempotency", "required_terms": ["409", "载荷"]},
+      {"text": "服务不会覆盖第一次结果", "source_uri": "kb://exampleapi/reference/idempotency", "required_terms": ["不会覆盖"]}
+    ]
+  },
+  {
+    "id": "faith-version-deprecation",
+    "query": "破坏性 API 变更的弃用期多长，排障时为什么还要同时记录 SDK 版本？",
+    "product_version": "v2",
+    "relevant_sources": ["kb://exampleapi/reference/versioning"],
+    "required_claims": [
+      {"text": "破坏性变更至少提前九十天发布 deprecation notice", "source_uri": "kb://exampleapi/reference/versioning", "required_terms": ["九十天", "deprecation notice"]},
+      {"text": "排障时必须同时记录 SDK 版本和实际请求路径", "source_uri": "kb://exampleapi/reference/versioning", "required_terms": ["SDK", "请求路径"]}
+    ]
+  },
+  {
+    "id": "faith-export-403",
+    "query": "批量导出返回 403 时，应依次检查哪些调用角色权限和租户 entitlement？",
+    "product_version": "v2",
+    "plan_code": "enterprise",
+    "relevant_sources": ["kb://exampleapi/features/bulk-export"],
+    "required_claims": [
+      {"text": "先确认调用角色拥有 exports:write", "source_uri": "kb://exampleapi/features/bulk-export", "required_terms": ["exports:write"]},
+      {"text": "再确认租户启用了 bulk_export", "source_uri": "kb://exampleapi/features/bulk-export", "required_terms": ["bulk_export"]}
+    ]
+  },
+  {
+    "id": "faith-delivery-dedupe",
+    "query": "Webhook 失败重试时，event_id 和 delivery_id 分别承担什么作用？",
+    "product_version": "v2",
+    "relevant_sources": ["kb://exampleapi/guides/webhook-delivery"],
+    "required_claims": [
+      {"text": "每次投递保持相同 event_id", "source_uri": "kb://exampleapi/guides/webhook-delivery", "required_terms": ["event_id"]},
+      {"text": "delivery_id 不同", "source_uri": "kb://exampleapi/guides/webhook-delivery", "required_terms": ["delivery_id"]},
+      {"text": "消费者必须按 event_id 去重", "source_uri": "kb://exampleapi/guides/webhook-delivery", "required_terms": ["去重"]}
+    ]
+  },
+  {
+    "id": "faith-pagination-cursor",
+    "query": "使用 next_cursor 翻页时，为什么必须保持相同过滤和排序参数？",
+    "product_version": "v2",
+    "relevant_sources": ["kb://exampleapi/reference/pagination"],
+    "required_claims": [
+      {"text": "cursor 是不透明字符串", "source_uri": "kb://exampleapi/reference/pagination", "required_terms": ["cursor", "不透明"]},
+      {"text": "下一次请求必须保持相同过滤和排序参数", "source_uri": "kb://exampleapi/reference/pagination", "required_terms": ["过滤", "排序"]}
+    ]
+  },
+  {
+    "id": "faith-region-endpoint",
+    "query": "新加坡租户报告高延迟时，应提供哪个实际 endpoint，能否按用户所在地推断区域？",
+    "product_version": "v2",
+    "relevant_sources": ["kb://exampleapi/reference/regions"],
+    "required_claims": [
+      {"text": "新加坡区域使用 https://ap-southeast-1.api.example.invalid", "source_uri": "kb://exampleapi/reference/regions", "required_terms": ["ap-southeast-1"]},
+      {"text": "不能只使用用户所在地推断", "source_uri": "kb://exampleapi/reference/regions", "required_terms": ["用户所在地"]}
+    ]
+  },
+  {
+    "id": "faith-negative-invoice",
+    "query": "ExampleAPI 的电子发票抬头和税率如何配置？",
+    "answerable": false,
+    "relevant_sources": [],
+    "required_claims": []
+  },
+  {
+    "id": "faith-negative-saml",
+    "query": "企业 SAML 登录的 ACS URL 和证书轮换步骤是什么？",
+    "answerable": false,
+    "relevant_sources": [],
+    "required_claims": []
+  },
+  {
+    "id": "faith-negative-audit-retention",
+    "query": "审计日志默认保留几年，能否导出到对象存储？",
+    "answerable": false,
+    "relevant_sources": [],
+    "required_claims": []
+  },
+  {
+    "id": "faith-negative-export-tax",
+    "query": "bulk_export 支持自定义发票税率吗？",
+    "answerable": false,
+    "relevant_sources": [],
+    "required_claims": []
+  }
+]
