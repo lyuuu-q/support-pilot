@@ -1,9 +1,10 @@
 from collections.abc import Iterator
+from dataclasses import dataclass
 from hashlib import sha256
-from typing import Literal, TypeAlias, cast
+from typing import Any, Literal, TypeAlias, cast
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from support_pilot.agent.checkpoints import open_checkpointer
@@ -27,13 +28,29 @@ from support_pilot.domain.sanitization import redact_text, redact_value
 from support_pilot.infrastructure.models import (
     AgentConversation,
     AgentRun,
+    AgentRunEvent,
     AuditEvent,
     UserAccount,
 )
 from support_pilot.rag.providers.base import EmbeddingProvider, RerankerProvider
 
 AgentStreamPayload: TypeAlias = TraceEvent | AgentResponse
-AgentStreamItem: TypeAlias = tuple[Literal["progress", "result"], AgentStreamPayload]
+
+
+@dataclass(frozen=True)
+class AgentStreamEvent:
+    name: Literal["progress", "result"]
+    payload: AgentStreamPayload
+    event_id: str
+    sequence: int
+
+
+@dataclass(frozen=True)
+class AgentReplayEvent:
+    sequence: int
+    event_name: str
+    payload: dict[str, Any]
+    event_id: str
 
 
 class AgentService:
@@ -58,15 +75,15 @@ class AgentService:
         idempotency_key: str | None,
     ) -> AgentResponse:
         response: AgentResponse | None = None
-        for event_name, payload in self.resolve_events(
+        for event in self.resolve_events(
             request,
             actor=actor,
             idempotency_key=idempotency_key,
         ):
-            if event_name == "result":
-                if not isinstance(payload, AgentResponse):
+            if event.name == "result":
+                if not isinstance(event.payload, AgentResponse):
                     raise RuntimeError("agent stream result has an invalid payload")
-                response = payload
+                response = event.payload
         if response is None:
             raise RuntimeError("agent stream completed without a result")
         return response
@@ -77,7 +94,7 @@ class AgentService:
         *,
         actor: UserAccount,
         idempotency_key: str | None,
-    ) -> Iterator[AgentStreamItem]:
+    ) -> Iterator[AgentStreamEvent]:
         conversation = self._get_or_create_conversation(request=request, actor=actor)
         resolved_request = self._merge_pending_context(request, conversation)
         confirmation_key_hash = self._validate_confirmation(
@@ -126,6 +143,7 @@ class AgentService:
             }
             if checkpointer is not None:
                 self.session.commit()
+            sequence = 0
             try:
                 emitted_trace_events = 0
                 state = initial_state
@@ -137,7 +155,13 @@ class AgentService:
                     state = streamed_state
                     trace = state.get("trace", [])
                     for trace_event in trace[emitted_trace_events:]:
-                        yield "progress", trace_event
+                        sequence += 1
+                        yield self._append_run_event(
+                            run=run,
+                            sequence=sequence,
+                            event_name="progress",
+                            payload=trace_event,
+                        )
                     emitted_trace_events = len(trace)
                     self._persist_progress(run=run, state=state)
             except Exception:
@@ -157,7 +181,15 @@ class AgentService:
         response = response.model_copy(update={"conversation_status": conversation.status})
         self._record_success(run=run, response=response)
         self.session.commit()
-        yield "result", response
+        sequence += 1
+        result_event = self._append_run_event(
+            run=run,
+            sequence=sequence,
+            event_name="result",
+            payload=response,
+        )
+        self.session.commit()
+        yield result_event
 
     def resume_run(self, run_id: UUID, *, actor: UserAccount) -> AgentResponse:
         run = self.session.get(AgentRun, run_id)
@@ -192,10 +224,22 @@ class AgentService:
             if not snapshot.values:
                 raise RequestPreconditionError("no checkpoint found for this run")
             state = cast(AgentState, snapshot.values)
+            sequence = self._next_run_sequence(run.id)
             try:
                 if snapshot.next:
+                    emitted_trace_events = 0
                     for streamed_state in graph.stream(None, config, stream_mode="values"):
                         state = cast(AgentState, streamed_state)
+                        trace = state.get("trace", [])
+                        for trace_event in trace[emitted_trace_events:]:
+                            sequence += 1
+                            self._append_run_event(
+                                run=run,
+                                sequence=sequence,
+                                event_name="progress",
+                                payload=trace_event,
+                            )
+                        emitted_trace_events = len(trace)
                         self._persist_progress(run=run, state=state)
                 response = response_from_state(
                     request_id=run.id,
@@ -219,6 +263,13 @@ class AgentService:
             response = response.model_copy(
                 update={"conversation_status": conversation.status}
             )
+            sequence += 1
+            self._append_run_event(
+                run=run,
+                sequence=sequence,
+                event_name="result",
+                payload=response,
+            )
             self._record_success(run=run, response=response)
             self.session.commit()
             return response
@@ -233,6 +284,67 @@ class AgentService:
         self.session.add(run)
         self.session.commit()
 
+    def _append_run_event(
+        self,
+        *,
+        run: AgentRun,
+        sequence: int,
+        event_name: Literal["progress", "result"],
+        payload: AgentStreamPayload | dict[str, Any],
+    ) -> AgentStreamEvent:
+        payload_json = payload if isinstance(payload, dict) else payload.model_dump(mode="json")
+        self.session.add(
+            AgentRunEvent(
+                run_id=run.id,
+                sequence=sequence,
+                event_name=event_name,
+                payload=payload_json,
+            )
+        )
+        return AgentStreamEvent(
+            name=event_name,
+            payload=cast(AgentStreamPayload, payload),
+            event_id=f"{run.id}:{sequence}",
+            sequence=sequence,
+        )
+
+    def _next_run_sequence(self, run_id: UUID) -> int:
+        current = self.session.scalar(
+            select(func.max(AgentRunEvent.sequence)).where(AgentRunEvent.run_id == run_id)
+        )
+        return int(current or 0)
+
+    def list_run_events(
+        self,
+        run_id: UUID,
+        *,
+        actor: UserAccount,
+        after: int = 0,
+        limit: int = 200,
+    ) -> list[AgentReplayEvent]:
+        run = self.session.get(AgentRun, run_id)
+        if run is None or run.user_id != actor.id:
+            raise ResourceNotFoundError("agent run not found")
+        rows = list(
+            self.session.scalars(
+                select(AgentRunEvent)
+                .where(
+                    AgentRunEvent.run_id == run_id,
+                    AgentRunEvent.sequence > after,
+                )
+                .order_by(AgentRunEvent.sequence)
+                .limit(limit)
+            )
+        )
+        return [
+            AgentReplayEvent(
+                sequence=row.sequence,
+                event_name=row.event_name,
+                payload=row.payload,
+                event_id=f"{run_id}:{row.sequence}",
+            )
+            for row in rows
+        ]
     def _get_or_create_conversation(
         self,
         *,

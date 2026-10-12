@@ -7,7 +7,12 @@ from fastapi import APIRouter, Header, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 
-from support_pilot.agent.contracts import AgentRequest, AgentResponse
+from support_pilot.agent.contracts import (
+    AgentRequest,
+    AgentResponse,
+    RunEventListResponse,
+    RunEventResponse,
+)
 from support_pilot.agent.providers import get_decision_provider
 from support_pilot.agent.service import AgentService
 from support_pilot.api.dependencies import CurrentUserDep, SessionDep
@@ -286,6 +291,42 @@ def resume_agent_run(
     ).resume_run(run_id, actor=actor)
 
 
+@router.get(
+    "/agent/runs/{run_id}/events",
+    response_model=RunEventListResponse,
+    responses={
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+    },
+    tags=["agent"],
+)
+def list_agent_run_events(
+    run_id: UUID,
+    actor: CurrentUserDep,
+    session: SessionDep,
+    after: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=500)] = 200,
+) -> RunEventListResponse:
+    embedding_provider, reranker_provider = get_provider_bundle()
+    events = AgentService(
+        session,
+        decision_provider=get_decision_provider(),
+        embedding_provider=embedding_provider,
+        reranker_provider=reranker_provider,
+    ).list_run_events(run_id, actor=actor, after=after, limit=limit)
+    return RunEventListResponse(
+        items=[
+            RunEventResponse(
+                sequence=event.sequence,
+                event=event.event_name,
+                payload=event.payload,
+                event_id=event.event_id,
+            )
+            for event in events
+        ]
+    )
+
+
 @router.post(
     "/agent/resolve/stream",
     response_class=StreamingResponse,
@@ -316,28 +357,20 @@ def stream_agent_request(
     )
 
     def event_stream() -> Iterator[str]:
-        sequence = 0
         try:
-            for event_name, payload in service.resolve_events(
+            for event in service.resolve_events(
                 request,
                 actor=actor,
                 idempotency_key=idempotency_key,
             ):
-                sequence += 1
-                yield _sse_event(
-                    event_name,
-                    payload,
-                    event_id=f"{request.session_id}:{sequence}",
-                )
+                yield _sse_event(event.name, event.payload, event_id=event.event_id)
         except DomainError as error:
-            sequence += 1
             yield _sse_event(
                 "error",
                 {"error": {"code": error.code, "message": str(error)}},
-                event_id=f"{request.session_id}:{sequence}",
+                event_id=f"{request.session_id}:error",
             )
         except Exception:
-            sequence += 1
             yield _sse_event(
                 "error",
                 {
@@ -346,7 +379,7 @@ def stream_agent_request(
                         "message": "Agent execution failed; retry or request human support.",
                     }
                 },
-                event_id=f"{request.session_id}:{sequence}",
+                event_id=f"{request.session_id}:error",
             )
 
     return StreamingResponse(

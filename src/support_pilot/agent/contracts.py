@@ -95,6 +95,17 @@ class TicketDraft(StrictAgentContract):
     requires_confirmation: Literal[True] = True
 
 
+class RunEventResponse(StrictAgentContract):
+    sequence: int = Field(ge=1)
+    event: str
+    payload: dict[str, Any]
+    event_id: str
+
+
+class RunEventListResponse(StrictAgentContract):
+    items: list[RunEventResponse]
+
+
 class AgentResponse(StrictAgentContract):
     request_id: UUID
     session_id: UUID

@@ -220,12 +220,14 @@ def test_agent_stream_assigns_monotonic_event_ids(client: TestClient, db_session
     )
 
     assert response.status_code == 200
+    events = _sse_events(response)
+    run_id = events[-1][1]["request_id"]
     event_ids = [
         line.removeprefix("id: ")
         for line in response.text.splitlines()
         if line.startswith("id: ")
     ]
-    assert event_ids == [f"{session_id}:{index}" for index in range(1, len(event_ids) + 1)]
+    assert event_ids == [f"{run_id}:{index}" for index in range(1, len(event_ids) + 1)]
     assert len(event_ids) == 5
 
 def test_agent_stream_returns_controlled_error_event_for_invalid_confirmation(
@@ -697,3 +699,53 @@ def test_agent_resume_rejects_non_owner_and_missing_checkpoint(
     )
     assert no_checkpoint.status_code == 400
     assert no_checkpoint.json()["error"]["code"] == "request_precondition_failed"
+
+
+
+def test_agent_run_events_replay_after_sequence(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    ingest_manifest(
+        db_session,
+        manifest_path=Path("data/knowledge/manifest.json"),
+        embedding_provider=DeterministicEmbeddingProvider(),
+    )
+    response = client.post(
+        "/api/v1/agent/resolve/stream",
+        headers=_headers(db_session),
+        json={
+            "session_id": "71000000-0000-0000-0000-000000000001",
+            "message": "HTTP 429 响应里的 Retry-After 应该如何处理？",
+            "context": {"product_version": "v2"},
+        },
+    )
+    stream_events = _sse_events(response)
+    run_id = stream_events[-1][1]["request_id"]
+
+    replay = client.get(
+        f"/api/v1/agent/runs/{run_id}/events",
+        headers=_headers(db_session),
+    )
+    assert replay.status_code == 200
+    items = replay.json()["items"]
+    assert [item["sequence"] for item in items] == list(range(1, len(items) + 1))
+    assert [item["event"] for item in items] == ["progress", "progress", "progress", "progress", "result"]
+    assert items[-1]["payload"]["request_id"] == run_id
+
+    after = client.get(
+        f"/api/v1/agent/runs/{run_id}/events?after=2",
+        headers=_headers(db_session),
+    )
+    assert after.status_code == 200
+    assert [item["sequence"] for item in after.json()["items"]] == [3, 4, 5]
+
+    other_user = db_session.scalar(
+        select(UserAccount).where(UserAccount.role == "tenant_admin")
+    )
+    assert other_user is not None
+    denied = client.get(
+        f"/api/v1/agent/runs/{run_id}/events",
+        headers={"X-User-Id": str(other_user.id)},
+    )
+    assert denied.status_code == 404
