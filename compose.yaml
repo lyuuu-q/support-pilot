@@ -10,6 +10,7 @@ services:
       SUPPORT_PILOT_JWT_SECRET: ${SUPPORT_PILOT_JWT_SECRET:-}
       SUPPORT_PILOT_OTEL_ENABLED: ${SUPPORT_PILOT_OTEL_ENABLED:-false}
       SUPPORT_PILOT_OTEL_EXPORTER_OTLP_ENDPOINT: ${SUPPORT_PILOT_OTEL_EXPORTER_OTLP_ENDPOINT:-http://host.docker.internal:4318/v1/traces}
+      SUPPORT_PILOT_OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: ${SUPPORT_PILOT_OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:-http://host.docker.internal:4318/v1/metrics}
     command: ["sh", "-c", "uv run alembic upgrade head && uv run python scripts/seed.py && uv run python scripts/ingest_knowledge.py --provider deterministic && uv run uvicorn support_pilot.main:app --host 0.0.0.0 --port 8000"]
     ports:
       - "8000:8000"
@@ -62,6 +63,15 @@ services:
       retries: 20
     tmpfs:
       - /var/lib/postgresql/data
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.121.0
+    profiles: ["observability"]
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./ops/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4318:4318"
 
 volumes:
   support_pilot_postgres_data:
