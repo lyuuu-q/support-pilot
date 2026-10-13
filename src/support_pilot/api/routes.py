@@ -4,7 +4,7 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Header, Query, Request, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from sqlalchemy import text
 
 from support_pilot.agent.contracts import (
@@ -15,16 +15,19 @@ from support_pilot.agent.contracts import (
 )
 from support_pilot.agent.providers import get_decision_provider
 from support_pilot.agent.service import AgentService
-from support_pilot.api.dependencies import CurrentUserDep, SessionDep
+from support_pilot.api.dependencies import CurrentUserDep, OidcClientDep, SessionDep
 from support_pilot.api.schemas import ErrorResponse
 from support_pilot.application.contracts import SupportInput, SupportResponse
 from support_pilot.application.services import SupportService
+from support_pilot.auth import oidc
 from support_pilot.auth.contracts import (
+    AuthProvidersResponse,
     AuthSessionListResponse,
     AuthSessionResponse,
     CurrentUserResponse,
     LoginRequest,
     LoginResponse,
+    OidcProviderResponse,
     TokenResponse,
 )
 from support_pilot.auth.service import authenticate_user, issue_access_token, record_auth_event
@@ -340,6 +343,91 @@ def logout_all_sessions(
         )
     response = Response(status_code=204)
     _clear_session_cookies(response)
+    return response
+
+
+@router.get(
+    "/auth/providers",
+    response_model=AuthProvidersResponse,
+    tags=["auth"],
+)
+def list_auth_providers() -> AuthProvidersResponse:
+    """Advertise which login methods the console should offer."""
+
+    settings = get_settings()
+    return AuthProvidersResponse(
+        password=True,
+        oidc=OidcProviderResponse(
+            enabled=settings.oidc_enabled,
+            display_name=settings.oidc_display_name,
+        ),
+    )
+
+
+@router.get(
+    "/auth/oidc/start",
+    responses={
+        302: {"description": "Redirect to the identity provider"},
+        503: {"model": ErrorResponse},
+    },
+    tags=["auth"],
+)
+def start_oidc_login(session: SessionDep, oidc_client: OidcClientDep) -> RedirectResponse:
+    """Begin the OIDC authorization code flow with PKCE."""
+
+    start = oidc.start_login(session, settings=get_settings(), client=oidc_client)
+    return RedirectResponse(start.authorization_url, status_code=302)
+
+
+@router.get(
+    "/auth/oidc/callback",
+    responses={
+        302: {"description": "Cookie session established, redirect to the console"},
+        400: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+    },
+    tags=["auth"],
+)
+def complete_oidc_login(
+    session: SessionDep,
+    oidc_client: OidcClientDep,
+    code: Annotated[str | None, Query()] = None,
+    state: Annotated[str | None, Query()] = None,
+    error: Annotated[str | None, Query()] = None,
+) -> RedirectResponse:
+    """Finish the flow, link the identity and issue the cookie session."""
+
+    settings = get_settings()
+    if error:
+        raise oidc.OidcFlowError(f"identity provider returned {error}")
+    if not code or not state:
+        raise oidc.OidcFlowError("callback is missing the code or state parameter")
+    try:
+        user = oidc.complete_login(
+            session, state=state, code=code, settings=settings, client=oidc_client
+        )
+    except DomainError:
+        record_auth_event(
+            session,
+            actor_id="anonymous",
+            outcome="denied",
+            reason_code="oidc_login_failed",
+        )
+        raise
+    record_auth_event(
+        session,
+        actor_id=str(user.id),
+        outcome="success",
+        reason_code="oidc_login",
+        tenant_id=user.tenant_id,
+    )
+    row, material = start_session(session, user, settings=settings)
+    token = issue_access_token(user, settings=settings, session_id=row.id)
+    session.commit()
+    record_session_started()
+    response = RedirectResponse(settings.oidc_post_login_redirect, status_code=302)
+    _set_session_cookies(response, access_token=token.access_token, material=material)
     return response
 
 

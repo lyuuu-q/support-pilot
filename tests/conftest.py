@@ -25,6 +25,8 @@ from support_pilot.main import app  # noqa: E402
 
 PROJECT_TABLES = (
     "auth_sessions",
+    "oidc_login_requests",
+    "user_identities",
     "human_feedback",
     "ticket_transitions",
     "agent_runs",

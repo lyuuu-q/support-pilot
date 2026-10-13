@@ -38,6 +38,16 @@ class LoginResponse(StrictAuthContract):
     expires_in: int
 
 
+class OidcProviderResponse(StrictAuthContract):
+    enabled: bool
+    display_name: str
+
+
+class AuthProvidersResponse(StrictAuthContract):
+    password: bool
+    oidc: OidcProviderResponse
+
+
 class AuthSessionResponse(StrictAuthContract):
     id: UUID
     user_agent: str | None

@@ -1,6 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
+import httpx
 from fastapi import Depends, Header, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
@@ -19,6 +20,15 @@ from support_pilot.infrastructure.models import UserAccount
 from support_pilot.infrastructure.repositories import SupportRepository
 
 SessionDep = Annotated[Session, Depends(get_db)]
+
+
+def get_oidc_client() -> httpx.Client | None:
+    """Seam for injecting an HTTP client (tests use a mock transport; production uses None)."""
+
+    return None
+
+
+OidcClientDep = Annotated[httpx.Client | None, Depends(get_oidc_client)]
 bearer_scheme = HTTPBearer(auto_error=False)
 
 

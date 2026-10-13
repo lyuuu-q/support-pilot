@@ -105,6 +105,42 @@ class AuthSession(Base, TimestampMixin):
     user_agent: Mapped[str | None] = mapped_column(String(200))
 
 
+class OidcLoginRequest(Base):
+    """Short-lived, single-use browser login attempt for the OIDC authorization code flow."""
+
+    __tablename__ = "oidc_login_requests"
+    __table_args__ = (Index("ix_oidc_login_requests_expires_at", "expires_at"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    state_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    nonce: Mapped[str] = mapped_column(String(128), nullable=False)
+    code_verifier: Mapped[str] = mapped_column(String(128), nullable=False)
+    redirect_uri: Mapped[str] = mapped_column(String(500), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class UserIdentity(Base, TimestampMixin):
+    """External identity binding; one row per (issuer, subject) pair."""
+
+    __tablename__ = "user_identities"
+    __table_args__ = (
+        UniqueConstraint("issuer", "subject", name="uq_user_identity_subject"),
+        Index("ix_user_identities_user_id", "user_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    issuer: Mapped[str] = mapped_column(String(255), nullable=False)
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+
+
 class Entitlement(Base, TimestampMixin):
     __tablename__ = "entitlements"
     __table_args__ = (

@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlparse
 
-from pydantic import AliasChoices, Field, SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -47,6 +47,16 @@ class Settings(BaseSettings):
     auth_refresh_cookie_path: str = "/api/v1/auth"
     auth_cookie_secure: bool = False
     auth_refresh_token_days: int = Field(default=14, ge=1, le=90)
+    oidc_enabled: bool = False
+    oidc_display_name: str = "企业账号"
+    oidc_issuer: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: SecretStr = SecretStr("")
+    oidc_scopes: str = "openid profile email"
+    oidc_redirect_uri: str = "http://localhost:8000/api/v1/auth/oidc/callback"
+    oidc_post_login_redirect: str = "/"
+    oidc_request_ttl_seconds: int = Field(default=600, ge=60, le=3600)
+    oidc_timeout_seconds: float = Field(default=10.0, gt=0.0, le=60.0)
     auth_session_retention_days: int = Field(default=30, ge=1)
     auth_session_prune_batch_size: int = Field(default=500, ge=1, le=10_000)
     otel_enabled: bool = False
@@ -103,6 +113,25 @@ class Settings(BaseSettings):
         if normalized not in {"log", "smtp", "webhook"}:
             raise ValueError("notification_channel must be 'log', 'smtp' or 'webhook'")
         return normalized
+
+    @field_validator("oidc_issuer")
+    @classmethod
+    def validate_oidc_issuer(cls, value: str) -> str:
+        if not value:
+            return value
+        parsed = urlparse(value)
+        local_hosts = {"localhost", "127.0.0.1", "::1"}
+        if parsed.scheme == "https" and parsed.hostname:
+            return value.rstrip("/")
+        if parsed.scheme == "http" and (parsed.hostname or "") in local_hosts:
+            return value.rstrip("/")
+        raise ValueError("oidc_issuer must be https, or http on a loopback host")
+
+    @model_validator(mode="after")
+    def validate_oidc_enabled(self) -> "Settings":
+        if self.oidc_enabled and not (self.oidc_issuer and self.oidc_client_id):
+            raise ValueError("oidc_issuer and oidc_client_id are required when OIDC is enabled")
+        return self
 
     @field_validator("qwen_base_url")
     @classmethod
