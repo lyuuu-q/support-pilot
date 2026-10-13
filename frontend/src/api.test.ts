@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { listRunEvents, listTickets, login, resumeAgentRun, streamAgent } from './api'
+import {
+  getAuthProviders,
+  listRunEvents,
+  listTickets,
+  login,
+  resumeAgentRun,
+  streamAgent,
+} from './api'
 
 afterEach(() => {
   document.cookie = 'support_pilot_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
@@ -55,6 +62,22 @@ describe('browser session requests', () => {
     expect((readHeaders.headers as Record<string, string>)['X-CSRF-Token']).toBeUndefined()
     const writeHeaders = fetchMock.mock.calls[1]?.[1] as RequestInit
     expect((writeHeaders.headers as Record<string, string>)['X-CSRF-Token']).toBe('csrf-from-cookie')
+  })
+
+  it('reads the advertised login providers', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ password: true, oidc: { enabled: true, display_name: '企业账号' } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const providers = await getAuthProviders()
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/auth/providers')
+    expect(providers.oidc.enabled).toBe(true)
+    expect(providers.oidc.display_name).toBe('企业账号')
   })
 
   it('returns the signed-in identity without exposing a token', async () => {

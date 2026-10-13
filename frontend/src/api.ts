@@ -72,6 +72,15 @@ export const logout = () => request<void>('/auth/logout', { method: 'POST' })
 
 export const logoutAll = () => request<void>('/auth/logout-all', { method: 'POST' })
 
+export interface AuthProviders {
+  password: boolean
+  oidc: { enabled: boolean; display_name: string }
+}
+
+export const getAuthProviders = () => request<AuthProviders>('/auth/providers')
+
+export const oidcStartUrl = () => `${API_BASE}/auth/oidc/start`
+
 /** Restore a browser session: reuse the access cookie, rotate once, otherwise stay logged out. */
 export async function restoreSession(): Promise<CurrentUser | null> {
   try {

@@ -179,6 +179,26 @@ describe('SupportPilot console', () => {
     expect(await screen.findByRole('button', { name: '进入工作台' })).toBeInTheDocument()
   })
 
+  it('offers enterprise sign-in only when the API advertises it', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/auth/me') || url.endsWith('/auth/refresh')) {
+        return new Response(JSON.stringify({ error: { code: 'authentication_required', message: 'none' } }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      if (url.endsWith('/auth/providers')) {
+        return jsonResponse({ password: true, oidc: { enabled: true, display_name: '企业账号' } })
+      }
+      throw new Error(`unexpected request: ${url}`)
+    }))
+    render(<App />)
+
+    const link = await screen.findByRole('link', { name: '使用企业账号登录' })
+    expect(link).toHaveAttribute('href', '/api/v1/auth/oidc/start')
+  })
+
   it('falls back to the login form when no session can be restored', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)

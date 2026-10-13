@@ -66,6 +66,22 @@ export default defineConfig({
         SUPPORT_PILOT_OTEL_ENABLED: 'false',
         SUPPORT_PILOT_JWT_SECRET: process.env.SUPPORT_PILOT_JWT_SECRET
           ?? 'e2e-only-jwt-secret-with-at-least-32-characters',
+        SUPPORT_PILOT_OIDC_ENABLED: 'true',
+        SUPPORT_PILOT_OIDC_ISSUER: 'http://127.0.0.1:18002',
+        SUPPORT_PILOT_OIDC_CLIENT_ID: 'support-pilot-console',
+        SUPPORT_PILOT_OIDC_REDIRECT_URI: 'http://127.0.0.1:15174/api/v1/auth/oidc/callback',
+        SUPPORT_PILOT_OIDC_POST_LOGIN_REDIRECT: '/',
+      } as Record<string, string>,
+    },
+    {
+      command: `${python} scripts/dev_oidc_provider.py`,
+      cwd: projectRoot,
+      url: 'http://127.0.0.1:18002/.well-known/openid-configuration',
+      reuseExistingServer: false,
+      timeout: 60_000,
+      env: {
+        ...process.env,
+        DEV_OIDC_ISSUER: 'http://127.0.0.1:18002',
       } as Record<string, string>,
     },
     {

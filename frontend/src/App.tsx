@@ -1,17 +1,20 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   claimTicket,
+  getAuthProviders,
   listRunEvents,
   listTickets,
   login,
   logout,
   logoutAll,
+  oidcStartUrl,
   resumeAgentRun,
   restoreSession,
   streamAgent,
   submitFeedback,
   transitionTicket,
 } from './api'
+import type { AuthProviders } from './api'
 import type { AgentResponse, CurrentUser, Ticket, TicketStatus, TraceEvent } from './types'
 import './styles.css'
 
@@ -24,6 +27,11 @@ function Login({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) => vo
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [providers, setProviders] = useState<AuthProviders | null>(null)
+
+  useEffect(() => {
+    getAuthProviders().then(setProviders).catch(() => setProviders(null))
+  }, [])
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -55,6 +63,7 @@ function Login({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) => vo
         <label>密码<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" required minLength={8} /></label>
         {error && <p className="error-banner" role="alert">{error}</p>}
         <button className="primary" disabled={busy}>{busy ? '验证中…' : '进入工作台'}</button>
+        {providers?.oidc.enabled && <a className="primary oidc-login" href={oidcStartUrl()}>使用{providers.oidc.display_name}登录</a>}
         <small>JWT 仅保存在当前浏览器；退出后立即移除。</small>
       </form>
     </main>

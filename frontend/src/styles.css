@@ -20,6 +20,7 @@ input, textarea, select { border: 1px solid var(--line); background: white; padd
 input:focus, textarea:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px #176b4a18; }
 .primary, .ghost { border: 1px solid var(--ink); padding: 12px 18px; font-weight: 700; }
 .primary { background: var(--ink); color: white; }
+.oidc-login { display: block; text-align: center; text-decoration: none; font-size: 14px; }
 .primary:hover { background: var(--green); border-color: var(--green); }
 .primary:disabled { opacity: .55; cursor: wait; }
 .ghost { background: transparent; color: var(--ink); }
