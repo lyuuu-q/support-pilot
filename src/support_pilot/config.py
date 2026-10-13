@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     auth_refresh_cookie_path: str = "/api/v1/auth"
     auth_cookie_secure: bool = False
     auth_refresh_token_days: int = Field(default=14, ge=1, le=90)
+    auth_session_retention_days: int = Field(default=30, ge=1)
+    auth_session_prune_batch_size: int = Field(default=500, ge=1, le=10_000)
     otel_enabled: bool = False
     otel_service_name: str = "support-pilot-api"
     otel_exporter_otlp_endpoint: str = "http://localhost:4318/v1/traces"

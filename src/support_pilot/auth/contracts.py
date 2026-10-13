@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -35,3 +36,15 @@ class LoginResponse(StrictAuthContract):
     user: CurrentUserResponse
     csrf_token: str
     expires_in: int
+
+
+class AuthSessionResponse(StrictAuthContract):
+    id: UUID
+    user_agent: str | None
+    issued_at: datetime
+    expires_at: datetime
+    current: bool
+
+
+class AuthSessionListResponse(StrictAuthContract):
+    items: list[AuthSessionResponse]

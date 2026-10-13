@@ -1,7 +1,8 @@
 param(
     [switch]$Execute,
     [int]$RunsOlderThanDays = 30,
-    [int]$EventsOlderThanDays = 7
+    [int]$EventsOlderThanDays = 7,
+    [int]$SessionsOlderThanDays = 30
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,17 +16,26 @@ if (-not $uv) {
     throw 'uv was not found on PATH.'
 }
 
-$arguments = @(
-    'run', '--no-sync', 'python', 'scripts/prune_agent_history.py',
-    '--runs-older-than-days', $RunsOlderThanDays,
-    '--events-older-than-days', $EventsOlderThanDays
-)
-if (-not $Execute) { $arguments += '--dry-run' }
+function Invoke-Prune {
+    param(
+        [string]$Script,
+        [string[]]$ScriptArguments
+    )
+    $arguments = @('run', '--no-sync', 'python', $Script) + $ScriptArguments
+    if (-not $Execute) { $arguments += '--dry-run' }
+    & $uv @arguments 2>&1 | Tee-Object -FilePath $logFile -Append
+    if ($LASTEXITCODE -ne 0) { throw "$Script failed with exit code $LASTEXITCODE" }
+}
 
 Push-Location $root
 try {
-    & $uv @arguments 2>&1 | Tee-Object -FilePath $logFile
-    if ($LASTEXITCODE -ne 0) { throw "Maintenance command failed with exit code $LASTEXITCODE" }
+    Invoke-Prune -Script 'scripts/prune_agent_history.py' -ScriptArguments @(
+        '--runs-older-than-days', $RunsOlderThanDays,
+        '--events-older-than-days', $EventsOlderThanDays
+    )
+    Invoke-Prune -Script 'scripts/prune_auth_sessions.py' -ScriptArguments @(
+        '--sessions-older-than-days', $SessionsOlderThanDays
+    )
 }
 finally {
     Pop-Location

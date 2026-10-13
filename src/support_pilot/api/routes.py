@@ -20,6 +20,8 @@ from support_pilot.api.schemas import ErrorResponse
 from support_pilot.application.contracts import SupportInput, SupportResponse
 from support_pilot.application.services import SupportService
 from support_pilot.auth.contracts import (
+    AuthSessionListResponse,
+    AuthSessionResponse,
     CurrentUserResponse,
     LoginRequest,
     LoginResponse,
@@ -29,21 +31,30 @@ from support_pilot.auth.service import authenticate_user, issue_access_token, re
 from support_pilot.auth.sessions import (
     IssuedSession,
     find_active_session,
+    list_active_sessions,
     lookup_session,
+    revoke_all_user_sessions,
     revoke_session,
+    revoke_user_session,
     rotate_session,
+    session_id_from_access_token,
     start_session,
     verify_csrf,
 )
 from support_pilot.channels.factory import get_outbound_channel
 from support_pilot.config import get_settings
 from support_pilot.domain.enums import TicketStatus
-from support_pilot.domain.errors import AuthenticationError, DomainError
+from support_pilot.domain.errors import (
+    AuthenticationError,
+    DomainError,
+    ResourceNotFoundError,
+)
 from support_pilot.infrastructure.models import UserAccount
 from support_pilot.infrastructure.repositories import SupportRepository
 from support_pilot.rag.contracts import KnowledgeSearchInput, KnowledgeSearchResponse
 from support_pilot.rag.providers.factory import get_provider_bundle
 from support_pilot.rag.retrieval import HybridRetrievalService
+from support_pilot.telemetry import record_session_revoked, record_session_started
 from support_pilot.tickets.contracts import (
     ClaimTicketRequest,
     HumanFeedbackRequest,
@@ -157,6 +168,7 @@ def login(
     row, material = start_session(session, user, settings=settings)
     token = issue_access_token(user, settings=settings, session_id=row.id)
     session.commit()
+    record_session_started()
     _set_session_cookies(response, access_token=token.access_token, material=material)
     return LoginResponse(
         user=_current_user_response(user),
@@ -217,6 +229,7 @@ def logout(request: Request, session: SessionDep) -> Response:
         )
         if revoke_session(session, session_id=row.id) is not None:
             session.commit()
+            record_session_revoked(reason="logout")
             record_auth_event(
                 session,
                 actor_id=str(row.user_id),
@@ -225,6 +238,106 @@ def logout(request: Request, session: SessionDep) -> Response:
                 action="auth.session.revoke",
                 resource_id=str(row.id),
             )
+    response = Response(status_code=204)
+    _clear_session_cookies(response)
+    return response
+
+
+@router.get(
+    "/auth/sessions",
+    response_model=AuthSessionListResponse,
+    responses={401: {"model": ErrorResponse}},
+    tags=["auth"],
+)
+def list_sessions(
+    request: Request,
+    session: SessionDep,
+    actor: CurrentUserDep,
+) -> AuthSessionListResponse:
+    """List the caller's active browser sessions."""
+
+    settings = get_settings()
+    current_id = session_id_from_access_token(
+        request.cookies.get(settings.auth_access_cookie), settings=settings
+    )
+    rows = list_active_sessions(session, user_id=actor.id)
+    return AuthSessionListResponse(
+        items=[
+            AuthSessionResponse(
+                id=row.id,
+                user_agent=row.user_agent,
+                issued_at=row.issued_at,
+                expires_at=row.expires_at,
+                current=row.id == current_id,
+            )
+            for row in rows
+        ]
+    )
+
+
+@router.post(
+    "/auth/sessions/{session_id}/revoke",
+    status_code=204,
+    responses={401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+    tags=["auth"],
+)
+def revoke_own_session(
+    session_id: UUID,
+    request: Request,
+    session: SessionDep,
+    actor: CurrentUserDep,
+) -> Response:
+    """Revoke one of the caller's sessions, clearing cookies when it is the current one."""
+
+    settings = get_settings()
+    row = revoke_user_session(session, session_id=session_id, user_id=actor.id)
+    if row is None:
+        raise ResourceNotFoundError("active session not found for this account")
+    session.commit()
+    record_session_revoked(reason="owner")
+    record_auth_event(
+        session,
+        actor_id=str(actor.id),
+        outcome="success",
+        reason_code="session_revoked_by_owner",
+        tenant_id=actor.tenant_id,
+        action="auth.session.revoke",
+        resource_id=str(row.id),
+    )
+    response = Response(status_code=204)
+    current_id = session_id_from_access_token(
+        request.cookies.get(settings.auth_access_cookie), settings=settings
+    )
+    if current_id == row.id:
+        _clear_session_cookies(response)
+    return response
+
+
+@router.post(
+    "/auth/logout-all",
+    status_code=204,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+    tags=["auth"],
+)
+def logout_all_sessions(
+    session: SessionDep,
+    actor: CurrentUserDep,
+) -> Response:
+    """Revoke every active session of the caller, not only the current one."""
+
+    revoked = revoke_all_user_sessions(session, user_id=actor.id)
+    session.commit()
+    if revoked:
+        record_session_revoked(reason="logout_all")
+        record_auth_event(
+            session,
+            actor_id=str(actor.id),
+            outcome="success",
+            reason_code="all_sessions_revoked",
+            tenant_id=actor.tenant_id,
+            action="auth.session.revoke_all",
+            resource_id=str(actor.id),
+        )
     response = Response(status_code=204)
     _clear_session_cookies(response)
     return response

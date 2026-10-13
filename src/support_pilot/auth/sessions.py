@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from support_pilot.auth.service import decode_access_token
 from support_pilot.config import Settings, get_settings
 from support_pilot.domain.errors import AuthenticationError, CsrfError
 from support_pilot.infrastructure.models import AuthSession, UserAccount
@@ -141,6 +142,87 @@ def revoke_session(
     row.revoked_at = moment
     session.flush()
     return row
+
+
+def session_id_from_access_token(
+    token: str | None, *, settings: Settings | None = None
+) -> UUID | None:
+    """Best-effort read of the ``sid`` claim; authentication already happened elsewhere."""
+
+    if not token:
+        return None
+    try:
+        payload = decode_access_token(token, settings=settings)
+    except AuthenticationError:
+        return None
+    raw_session_id = payload.get("sid")
+    if not isinstance(raw_session_id, str):
+        return None
+    try:
+        return UUID(raw_session_id)
+    except ValueError:
+        return None
+
+
+def list_active_sessions(
+    session: Session,
+    *,
+    user_id: UUID,
+    now: datetime | None = None,
+) -> list[AuthSession]:
+    moment = now or datetime.now(UTC)
+    return list(
+        session.scalars(
+            select(AuthSession)
+            .where(
+                AuthSession.user_id == user_id,
+                AuthSession.status == "active",
+                AuthSession.expires_at > moment,
+            )
+            .order_by(AuthSession.issued_at.desc())
+        )
+    )
+
+
+def revoke_user_session(
+    session: Session,
+    *,
+    session_id: UUID,
+    user_id: UUID,
+    now: datetime | None = None,
+) -> AuthSession | None:
+    """Revoke one session, but only when it belongs to the caller."""
+
+    moment = now or datetime.now(UTC)
+    row = session.get(AuthSession, session_id)
+    if row is None or row.user_id != user_id or row.status != "active":
+        return None
+    row.status = "revoked"
+    row.revoked_at = moment
+    session.flush()
+    return row
+
+
+def revoke_all_user_sessions(
+    session: Session,
+    *,
+    user_id: UUID,
+    now: datetime | None = None,
+) -> int:
+    moment = now or datetime.now(UTC)
+    rows = list(
+        session.scalars(
+            select(AuthSession).where(
+                AuthSession.user_id == user_id,
+                AuthSession.status == "active",
+            )
+        )
+    )
+    for row in rows:
+        row.status = "revoked"
+        row.revoked_at = moment
+    session.flush()
+    return len(rows)
 
 
 def verify_csrf(

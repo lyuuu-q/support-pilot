@@ -98,6 +98,22 @@ def record_rag_search(
     )
 
 
+def record_session_started() -> None:
+    get_meter().create_counter("support_pilot.auth.sessions_started", unit="1").add(1)
+
+
+def record_session_revoked(*, reason: str) -> None:
+    get_meter().create_counter("support_pilot.auth.sessions_revoked", unit="1").add(
+        1, {"reason": reason}
+    )
+
+
+def record_session_prune(*, deleted_sessions: int, dry_run: bool) -> None:
+    get_meter().create_counter("support_pilot.auth.sessions_pruned", unit="1").add(
+        deleted_sessions, {"dry_run": dry_run}
+    )
+
+
 def record_retention_prune(
     *,
     deleted_events: int,
