@@ -28,8 +28,11 @@ def test_enabled_telemetry_wires_fastapi_database_and_otlp_exporter() -> None:
 
     with (
         patch("support_pilot.telemetry.OTLPSpanExporter") as exporter,
+        patch("support_pilot.telemetry.OTLPMetricExporter") as metric_exporter,
         patch("support_pilot.telemetry.BatchSpanProcessor"),
+        patch("support_pilot.telemetry.PeriodicExportingMetricReader"),
         patch("support_pilot.telemetry.trace.set_tracer_provider"),
+        patch("support_pilot.telemetry.metrics.set_meter_provider") as metrics_provider,
         patch("support_pilot.telemetry.FastAPIInstrumentor.instrument_app") as fastapi,
         patch("support_pilot.telemetry.SQLAlchemyInstrumentor.instrument") as database,
     ):
@@ -38,5 +41,7 @@ def test_enabled_telemetry_wires_fastapi_database_and_otlp_exporter() -> None:
     assert configured is True
     assert app.state.telemetry_configured is True
     exporter.assert_called_once_with(endpoint="http://collector:4318/v1/traces")
+    metric_exporter.assert_called_once_with(endpoint="http://localhost:4318/v1/metrics")
+    metrics_provider.assert_called_once()
     fastapi.assert_called_once()
     database.assert_called_once()

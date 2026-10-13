@@ -1,3 +1,4 @@
+import time
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -35,6 +36,7 @@ from support_pilot.infrastructure.models import (
     UserAccount,
 )
 from support_pilot.rag.providers.base import EmbeddingProvider, RerankerProvider
+from support_pilot.telemetry import get_tracer, record_agent_resume, record_agent_run
 
 AgentStreamPayload: TypeAlias = TraceEvent | AgentResponse
 
@@ -119,6 +121,10 @@ class AgentService:
         )
         self.session.add(run)
         self.session.flush()
+        started = time.perf_counter()
+        span = get_tracer().start_span("agent.run")
+        span.set_attribute("agent.provider", self.decision_provider.provider_name)
+        span.set_attribute("agent.model", self.decision_provider.model_name)
         initial_state: AgentState = {
             "request": resolved_request,
             "resume_intent": (
@@ -166,7 +172,9 @@ class AgentService:
                         )
                     emitted_trace_events = len(trace)
                     self._persist_progress(run=run, state=state)
-            except Exception:
+            except Exception as error:
+                span.record_exception(error)
+                span.end()
                 self._record_unexpected_failure(
                     run=run,
                     trace_id=trace_id,
@@ -191,6 +199,17 @@ class AgentService:
             payload=response,
         )
         self.session.commit()
+        span.set_attribute("agent.outcome", response.outcome)
+        span.set_attribute("agent.intent", response.intent)
+        span.set_attribute("agent.risk_level", response.risk_level)
+        record_agent_run(
+            duration_ms=(time.perf_counter() - started) * 1000,
+            outcome=response.outcome,
+            intent=response.intent,
+            provider=self.decision_provider.provider_name,
+            risk_level=response.risk_level,
+        )
+        span.end()
         yield result_event
 
     def resume_run(self, run_id: UUID, *, actor: UserAccount) -> AgentResponse:
@@ -203,6 +222,9 @@ class AgentService:
             raise RequestPreconditionError("agent run is not resumable")
         run.status = "resuming"
         self.session.commit()
+        resume_started = time.perf_counter()
+        resume_span = get_tracer().start_span("agent.resume")
+        resume_span.set_attribute("agent.run_id", str(run.id))
         conversation = self.session.scalar(
             select(AgentConversation).where(
                 AgentConversation.session_id == run.session_id,
@@ -252,7 +274,9 @@ class AgentService:
                     trace_id=run.trace_id,
                     state=state,
                 )
-            except Exception:
+            except Exception as error:
+                resume_span.record_exception(error)
+                resume_span.end()
                 self._record_unexpected_failure(
                     run=run,
                     trace_id=run.trace_id,
@@ -278,6 +302,12 @@ class AgentService:
             )
             self._record_success(run=run, response=response)
             self.session.commit()
+            resume_span.set_attribute("agent.outcome", response.outcome)
+            record_agent_resume(
+                result=response.outcome,
+                duration_ms=(time.perf_counter() - resume_started) * 1000,
+            )
+            resume_span.end()
             return response
 
     def _persist_progress(self, *, run: AgentRun, state: AgentState) -> None:

@@ -1,3 +1,4 @@
+import time
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -13,6 +14,7 @@ from support_pilot.rag.contracts import (
 from support_pilot.rag.faithfulness import build_evidence_claims
 from support_pilot.rag.providers.base import EmbeddingProvider, RerankerProvider
 from support_pilot.rag.repository import KnowledgeRepository, SearchRow
+from support_pilot.telemetry import get_tracer, record_rag_search
 
 
 @dataclass
@@ -64,6 +66,22 @@ class HybridRetrievalService:
         )
 
     def search(self, request: KnowledgeSearchInput) -> KnowledgeSearchResponse:
+        started = time.perf_counter()
+        with get_tracer().start_as_current_span("rag.retrieval") as span:
+            response = self._search(request)
+            duration_ms = (time.perf_counter() - started) * 1000
+            span.set_attribute("rag.answerable", response.decision.answerable)
+            span.set_attribute("rag.reason", response.decision.reason)
+            span.set_attribute("rag.hit_count", len(response.hits))
+            record_rag_search(
+                duration_ms=duration_ms,
+                answerable=response.decision.answerable,
+                reason=response.decision.reason,
+                hit_count=len(response.hits),
+            )
+            return response
+
+    def _search(self, request: KnowledgeSearchInput) -> KnowledgeSearchResponse:
         keyword_rows = self.repository.keyword_search(
             query=request.query,
             filters=request.filters,

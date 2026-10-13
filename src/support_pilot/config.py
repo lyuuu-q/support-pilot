@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     otel_enabled: bool = False
     otel_service_name: str = "support-pilot-api"
     otel_exporter_otlp_endpoint: str = "http://localhost:4318/v1/traces"
+    otel_exporter_otlp_metrics_endpoint: str = "http://localhost:4318/v1/metrics"
     agent_max_attempts: int = Field(default=2, ge=1, le=3)
     agent_checkpoint_enabled: bool = True
     agent_resume_stale_seconds: int = Field(default=300, ge=30, le=86_400)

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from support_pilot.agent.checkpoints import open_checkpointer
 from support_pilot.infrastructure.models import AgentRun, AgentRunEvent
+from support_pilot.telemetry import get_tracer, record_retention_prune
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,7 @@ def prune_agent_history(
     limit: int,
     dry_run: bool = False,
 ) -> PruneReport:
+    span = get_tracer().start_span("agent.retention.prune")
     run_ids = list(
         session.scalars(
             select(AgentRun.id)
@@ -52,6 +54,14 @@ def prune_agent_history(
             or 0
         )
         session.rollback()
+        span.set_attribute("retention.dry_run", True)
+        record_retention_prune(
+            deleted_events=int(event_count),
+            deleted_runs=len(run_ids),
+            deleted_threads=0,
+            dry_run=True,
+        )
+        span.end()
         return PruneReport(
             event_cutoff=event_cutoff,
             run_cutoff=run_cutoff,
@@ -83,6 +93,14 @@ def prune_agent_history(
     else:
         deleted_runs = 0
     session.commit()
+    span.set_attribute("retention.dry_run", False)
+    record_retention_prune(
+        deleted_events=int(deleted_events),
+        deleted_runs=int(deleted_runs),
+        deleted_threads=deleted_threads,
+        dry_run=False,
+    )
+    span.end()
     return PruneReport(
         event_cutoff=event_cutoff,
         run_cutoff=run_cutoff,
