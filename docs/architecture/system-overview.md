@@ -6,8 +6,8 @@
 flowchart LR
     C[客户] --> UI[React Console]
     S[支持人员] --> UI
-    UI -->|JWT + REST/SSE| API[FastAPI modular monolith]
-    API --> AUTH[Auth / RBAC]
+    UI -->|HttpOnly Cookie 会话 + REST/SSE| API[FastAPI modular monolith]
+    API --> AUTH[Auth / RBAC\n本地口令 + OIDC 授权码]
     API --> AGENT[LangGraph Agent]
     AGENT --> SAFE[Risk & Injection Gate]
     AGENT --> RAG[Hybrid RAG]
@@ -30,7 +30,7 @@ sequenceDiagram
     participant G as LangGraph
     participant D as PostgreSQL
     participant H as Support UI
-    U->>A: POST resolve/stream + JWT
+    U->>A: POST resolve/stream + Cookie 会话
     A->>D: lock/load conversation
     A->>G: stream(initial_state)
     loop each completed node

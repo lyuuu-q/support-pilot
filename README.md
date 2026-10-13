@@ -172,13 +172,27 @@ Agent、RAG 与历史清理提供 `agent.run`、`agent.resume`、`rag.retrieval`
 
 本地默认 `SUPPORT_PILOT_AUTH_COOKIE_SECURE=false`，通过 HTTPS 部署时必须改为 `true`。当前实现未包含设备指纹、IP 记录、活跃会话数量上限和 OIDC；`SameSite=Lax` 加双提交是纵深防御，不是 CSRF 的形式化证明。
 
+## 企业身份（OIDC）
+
+设置 `SUPPORT_PILOT_OIDC_ENABLED=true` 并给出 issuer、client id 与 redirect uri 后，控制台登录页会出现"使用企业账号登录"，走标准**授权码 + PKCE(S256)** 流程。服务端只接受非对称签名算法（显式拒绝 HS256，防算法混淆），校验 `iss/aud/exp/nonce`，并要求 `email_verified=true`，然后**只按已验证邮箱绑定已存在的本地账号**——不会自动创建用户。绑定关系写入 `user_identities`，之后按 `(issuer, subject)` 登录。
+
+登录成功后不保留 IdP 的令牌，而是立即签发本项目自己的 Cookie 会话，因此撤销、CSRF、保留清理全部复用前两个阶段的机制。本地口令登录保留，属于并行入口。
+
+本地演示与自动化测试使用 `scripts/dev_oidc_provider.py`（内存态、RS256、校验 PKCE 的**开发用** IdP，仅认三个合成账号）：
+
+```powershell
+uv run python scripts/dev_oidc_provider.py
+```
+
+当前**没有与任何真实 IdP 联调**，也没有 RP-initiated logout、JIT 建号、角色映射与 MFA；这些边界写在 [OIDC ADR](./docs/adr/0018-oidc-login-and-identity-linking.md) 里。
+
 ## 工单通知与验证边界
 
 创建工单的数据库事务提交后，系统通过可配置的 `OutboundChannel` 发送通知；通知失败只记录公开工单号，不回滚已经创建的工单，使用同一幂等键重放也不会重复投递。默认 `log` 通道无需外部服务；`smtp` 和 `webhook` 通过 `.env` 中的 `SUPPORT_PILOT_NOTIFICATION_CHANNEL` 切换。
 
 SMTP 密码与 Webhook URL 使用 `SecretStr` 保存；认证 SMTP 强制启用证书和主机名校验，Webhook 强制 HTTPS、显式主机白名单并拒绝非公网 IP 与环境代理。自动化测试只使用 Mock/Fake 外部边界，不代表真实邮件或群机器人已经完成线上投递验证。
 
-当前验证结果为 136 项后端测试通过；14 项前端单元测试和 1 条浏览器业务 E2E 已在本机复跑通过；80 场景 deterministic Agent 评测 80/80；faithfulness v2 的 claim support rate 为 1.000、false answer rate 为 0.000、claim coverage 为 0.8333。Alembic upgrade/check 已通过。浏览器 E2E 使用确定性 Provider、隔离的 `support_pilot_test` 数据库和 `log` 通知通道，不会调用付费模型或外部通知服务。
+当前验证结果为 149 项后端测试通过；16 项前端单元测试和 2 条浏览器 E2E（企业登录闭环 + 工单闭环）已在本机复跑通过；80 场景 deterministic Agent 评测 80/80；faithfulness v2 的 claim support rate 为 1.000、false answer rate 为 0.000、claim coverage 为 0.8333。Alembic upgrade/check 已通过。浏览器 E2E 使用确定性 Provider、隔离的 `support_pilot_test` 数据库和 `log` 通知通道，不会调用付费模型或外部通知服务。
 
 ## 验证
 
@@ -193,6 +207,7 @@ npm run lint
 npm run test
 npm run build
 $env:PLAYWRIGHT_BROWSERS_PATH = 'C:\Users\刘雨晴\Documents\github\.playwright-browsers'
+# E2E 会额外启动本地开发用 IdP（127.0.0.1:18002）以验证 OIDC 跳转闭环
 npx playwright install chromium
 npm run test:e2e
 
@@ -283,3 +298,7 @@ npm run test:e2e
 - [会话生命周期与清理 ADR](./docs/adr/0017-browser-session-lifecycle-and-pruning.md)
 - [第十八阶段会话清理评测](./docs/evaluation/stage-18-session-lifecycle-evaluation.md)
 - [第十八阶段学习说明](./docs/learning/stage-18-session-lifecycle.md)
+- [第十九阶段 OIDC 登录验收](./docs/product/stage-19-acceptance.md)
+- [OIDC 登录与身份绑定 ADR](./docs/adr/0018-oidc-login-and-identity-linking.md)
+- [第十九阶段 OIDC 评测](./docs/evaluation/stage-19-oidc-evaluation.md)
+- [第十九阶段学习说明](./docs/learning/stage-19-oidc-login.md)

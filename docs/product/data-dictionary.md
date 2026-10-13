@@ -37,6 +37,40 @@
 | role | `customer_developer/tenant_admin/support_agent/knowledge_admin` | 是 | RBAC 基础角色 |
 | status | `active/disabled` | 是 | 禁用用户不能调用租户工具 |
 
+### AuthSession（浏览器会话，已实现）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| id | UUID | 主键 |
+| user_id | UUID → User | 会话归属账号 |
+| token_hash | String(64) | refresh 令牌的 SHA-256，明文不落库 |
+| csrf_hash | String(64) | CSRF 令牌的 SHA-256 |
+| status | active / revoked | 生命周期状态 |
+| issued_at / expires_at / revoked_at | DateTime | 有效期与撤销时间 |
+| rotated_from | UUID → AuthSession | 刷新轮换链 |
+| user_agent | String(200) | 仅记录客户端标识，不记录 IP |
+
+### UserIdentity（外部身份绑定，已实现）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| id | UUID | 主键 |
+| user_id | UUID → User | 本地账号 |
+| issuer | String(255) | IdP 标识（与 subject 组成唯一键） |
+| subject | String(255) | IdP 中的用户主键，邮箱改名不影响绑定 |
+| email | String(320) | 绑定时已验证的邮箱，仅供审计 |
+
+### OidcLoginRequest（OIDC 登录流程，已实现）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| id | UUID | 主键 |
+| state_hash | String(64) | state 的 SHA-256，明文不回存 |
+| nonce | String(128) | 绑定 ID Token 的一次性随机值 |
+| code_verifier | String(128) | PKCE 校验值，单次使用 |
+| redirect_uri | String(500) | 授权回调地址 |
+| expires_at / consumed_at | DateTime | 10 分钟过期、用后即焚 |
+
 ### SessionContext（会话上下文）
 
 | 字段 | 类型/枚举 | 必填 | 说明 |

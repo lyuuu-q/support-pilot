@@ -20,6 +20,7 @@
 - SSE progress/result 事件按 run_id + sequence 持久化，所有者可通过回放 API 读取断线前事件，为 Last-Event-ID 续传提供基础。
 - 前端在 SSE 网络中断后自动回放已发生事件并调用 checkpoint 恢复接口，无需用户重新提交。
 - 恢复使用 PostgreSQL 行锁和 resuming 状态防止并发重复执行；提供带 dry-run 的历史清理脚本，保留活跃运行及其事件。
+- 登录支持标准 OIDC 授权码 + PKCE：只接受非对称签名算法、校验 state/nonce/iss/aud/exp 与 `email_verified`，按已验证邮箱绑定既有账号且不隐式建号。
 - 浏览器会话可列出、可单个撤销、可一键全部撤销，并按保留期清理过期行（活跃会话在判定上永不被选中）。
 - 浏览器端改用 HttpOnly Cookie 会话并通过 `X-CSRF-Token` 双提交防御 CSRF；访问令牌绑定会话行，登出与 refresh 轮换后可即时撤销。
 - 在 OTLP Trace 之外增加 Metrics：Agent、RAG 与历史清理产生有界标签的 counter/histogram，并提供 Compose `observability` profile 的 Collector（当前仅 debug exporter）与默认 dry-run 的维护脚本。
@@ -49,6 +50,9 @@
 | 浏览器 E2E（Cookie 会话闭环） | Playwright 自带 Chromium v1243（本地缓存路径） | 单浏览器、本机确定性 Provider，与 CI 浏览器一致 |
 | 136 tests | 2026-10-14 全量 pytest 记录 | 含 9 项会话管理与清理测试，合成数据 |
 | 会话数量控制 | `tests/integration/test_auth_session_retention.py` | 本机批量清理，未验证生产会话规模 |
+| 149 tests | 2026-10-14 全量 pytest 记录 | 含 13 项 OIDC 测试，合成账号与本地 IdP |
+| OIDC 授权码 + PKCE | `tests/integration/test_oidc_login.py` | 假 IdP + 本地开发 IdP，**未与真实 IdP 联调** |
+| 2 browser E2E | Playwright Chromium：企业登录闭环 + 工单闭环 | 单浏览器、本地 IdP、确定性 Provider |
 
 ## 演示顺序（5–7 分钟）
 
@@ -63,6 +67,7 @@
 - 不声称"服务真实企业客户""线上准确率 98.75%""生产节省多少人力"；
 - 不把 Qwen macro-F1 写成 1.0——1.0 属于确定性 80 场景，Qwen 只有 7 条冒烟；
 - 不声称"已经生产部署"——GitHub Actions 已验证镜像构建、整套 Compose 启动与短时探活，但未验证生产配置、容量、可用性或长期稳定性；
+- 不声称已接入真实企业身份系统——只有本地开发用 IdP 与假 IdP 测试，未联调 Keycloak/Auth0/企业微信；
 - 不声称会话管理达到生产设备管理能力——没有 IP、设备指纹、活跃会话数量上限与自动调度；
 - 不声称 Cookie 会话已通过生产安全评审——没有设备列表、撤销全部会话、OIDC 和 HTTPS Cookie 的实测；
 - 不声称已接入生产监控、告警或 SLO——Collector 当前只有 debug exporter，指标来自本机合成流量；
