@@ -52,6 +52,8 @@ http://host.docker.internal:4318/v1/metrics
 
 ## 4. 定时维护
 
+维护脚本一次执行两段清理：Agent 运行/事件/checkpoint，以及过期的浏览器会话。
+
 每日 dry-run：
 
 ```powershell
@@ -67,8 +69,17 @@ http://host.docker.internal:4318/v1/metrics
 自定义保留期：
 
 ```powershell
-.\scripts\run_maintenance.ps1 -Execute -RunsOlderThanDays 60 -EventsOlderThanDays 14
+.\scripts\run_maintenance.ps1 -Execute -RunsOlderThanDays 60 -EventsOlderThanDays 14 -SessionsOlderThanDays 45
 ```
+
+单独清理会话（默认 dry-run）：
+
+```powershell
+uv run python scripts/prune_auth_sessions.py --dry-run
+uv run python scripts/prune_auth_sessions.py
+```
+
+会话保留期建议不小于 refresh 有效期（默认 30 天 vs 14 天）；清理只删除 `expires_at` 早于保留期的行，活跃会话不会被删除。
 
 日志写入被 Git 忽略的 `logs/`。
 
@@ -84,7 +95,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File <repo>\scripts\run_maint
 - 写操作 403 `csrf_token_invalid`：确认请求带 `X-CSRF-Token` 且等于 `support_pilot_csrf` Cookie 值；
 - 用户被强制登出：refresh Cookie 只作用于 `/api/v1/auth`，检查反向代理是否改写路径前缀；
 - 令牌被撤销后仍能访问：确认没有绕过 Cookie 路径使用 Bearer 令牌（Bearer 不校验会话状态，供脚本使用）；
-- 生产 HTTPS 部署必须设置 `SUPPORT_PILOT_AUTH_COOKIE_SECURE=true`。
+- 生产 HTTPS 部署必须设置 `SUPPORT_PILOT_AUTH_COOKIE_SECURE=true`；
+- 用户反映"被登出"：先查 `support_pilot.auth.sessions_revoked` 的 reason 标签，区分本人登出、单会话撤销与全部撤销；
+- 会话数异常增长：检查客户端是否在循环中刷新（每次 refresh 都会新增一行）。
 
 ## 6. 故障排查
 

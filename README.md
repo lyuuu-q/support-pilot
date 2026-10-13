@@ -168,7 +168,9 @@ Agent、RAG 与历史清理提供 `agent.run`、`agent.resume`、`rag.retrieval`
 
 访问令牌带 `sid` 声明并绑定会话行，所以登出或撤销后立即失效，而不是等令牌过期。refresh 令牌每次使用都会轮换，旧令牌重放返回 401。命令行脚本、集成测试与第三方客户端仍可显式使用 `session_mode="token"` 获取 Bearer 令牌；`scripts/demo.ps1` 即使用该模式。
 
-本地默认 `SUPPORT_PILOT_AUTH_COOKIE_SECURE=false`，通过 HTTPS 部署时必须改为 `true`。当前实现未包含设备列表、撤销全部会话和 OIDC；`SameSite=Lax` 加双提交是纵深防御，不是 CSRF 的形式化证明。
+会话可管理：`GET /api/v1/auth/sessions` 列出当前账号的活跃会话并标出当前会话，`POST /api/v1/auth/sessions/{id}/revoke` 撤销指定会话（撤销他人会话返回 404），`POST /api/v1/auth/logout-all` 一键撤销全部会话。控制台顶栏提供"登出所有设备"。过期的会话行由维护脚本按保留期清理，只删除 `expires_at` 早于 `now - SUPPORT_PILOT_AUTH_SESSION_RETENTION_DAYS` 的记录，活跃会话在判定上不可能被选中。
+
+本地默认 `SUPPORT_PILOT_AUTH_COOKIE_SECURE=false`，通过 HTTPS 部署时必须改为 `true`。当前实现未包含设备指纹、IP 记录、活跃会话数量上限和 OIDC；`SameSite=Lax` 加双提交是纵深防御，不是 CSRF 的形式化证明。
 
 ## 工单通知与验证边界
 
@@ -176,7 +178,7 @@ Agent、RAG 与历史清理提供 `agent.run`、`agent.resume`、`rag.retrieval`
 
 SMTP 密码与 Webhook URL 使用 `SecretStr` 保存；认证 SMTP 强制启用证书和主机名校验，Webhook 强制 HTTPS、显式主机白名单并拒绝非公网 IP 与环境代理。自动化测试只使用 Mock/Fake 外部边界，不代表真实邮件或群机器人已经完成线上投递验证。
 
-当前验证结果为 127 项后端测试通过；13 项前端单元测试和 1 条浏览器业务 E2E 已在本机复跑通过；80 场景 deterministic Agent 评测 80/80；faithfulness v2 的 claim support rate 为 1.000、false answer rate 为 0.000、claim coverage 为 0.8333。Alembic upgrade/check 已通过。浏览器 E2E 使用确定性 Provider、隔离的 `support_pilot_test` 数据库和 `log` 通知通道，不会调用付费模型或外部通知服务。
+当前验证结果为 136 项后端测试通过；14 项前端单元测试和 1 条浏览器业务 E2E 已在本机复跑通过；80 场景 deterministic Agent 评测 80/80；faithfulness v2 的 claim support rate 为 1.000、false answer rate 为 0.000、claim coverage 为 0.8333。Alembic upgrade/check 已通过。浏览器 E2E 使用确定性 Provider、隔离的 `support_pilot_test` 数据库和 `log` 通知通道，不会调用付费模型或外部通知服务。
 
 ## 验证
 
@@ -277,3 +279,7 @@ npm run test:e2e
 - [Cookie 会话与 CSRF ADR](./docs/adr/0016-cookie-sessions-and-csrf.md)
 - [第十七阶段会话评测](./docs/evaluation/stage-17-cookie-session-evaluation.md)
 - [第十七阶段学习说明](./docs/learning/stage-17-cookie-sessions-and-csrf.md)
+- [第十八阶段会话生命周期验收](./docs/product/stage-18-acceptance.md)
+- [会话生命周期与清理 ADR](./docs/adr/0017-browser-session-lifecycle-and-pruning.md)
+- [第十八阶段会话清理评测](./docs/evaluation/stage-18-session-lifecycle-evaluation.md)
+- [第十八阶段学习说明](./docs/learning/stage-18-session-lifecycle.md)
