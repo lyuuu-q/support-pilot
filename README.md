@@ -151,7 +151,9 @@ docker compose --profile observability up -d otel-collector
 docker compose --profile observability logs -f otel-collector
 ```
 
-Agent、RAG 与历史清理提供 `agent.run`、`agent.resume`、`rag.retrieval`、`agent.retention.prune` 四个 Span 和对应的 counter/histogram 指标，标签只使用有界枚举。当前 Collector 只配置 debug exporter，用于本地验证链路，不接 Jaeger/Prometheus，也不代表生产监控或 SLO。
+Agent、RAG、会话与历史清理提供 `agent.run`、`agent.resume`、`rag.retrieval`、`agent.retention.prune` 等 Span 和对应的 counter/histogram 指标，标签只使用有界枚举。指标除了写进 Collector 日志，还通过 Prometheus 导出端点暴露在 `http://127.0.0.1:8889/metrics`；同一个 `observability` profile 下可以启动 Prometheus（9090）抓取并加载 `ops/alerting-rules.yml` 的 5 条告警规则。不装 Prometheus 时可用 `uv run python scripts/metrics_snapshot.py` 生成可提交的指标快照。
+
+注意区分：这仍是**本地可复现的观测链路**，没有长期存储、Grafana 看板、Alertmanager 通知，也不代表生产监控或 SLO。每日维护任务可用 `scripts/register_maintenance_task.ps1` 注册（需要管理员权限）。
 
 历史清理通过维护脚本执行，默认 dry-run：
 
@@ -192,7 +194,7 @@ uv run python scripts/dev_oidc_provider.py
 
 SMTP 密码与 Webhook URL 使用 `SecretStr` 保存；认证 SMTP 强制启用证书和主机名校验，Webhook 强制 HTTPS、显式主机白名单并拒绝非公网 IP 与环境代理。自动化测试只使用 Mock/Fake 外部边界，不代表真实邮件或群机器人已经完成线上投递验证。
 
-当前验证结果为 149 项后端测试通过；16 项前端单元测试和 2 条浏览器 E2E（企业登录闭环 + 工单闭环）已在本机复跑通过；80 场景 deterministic Agent 评测 80/80；faithfulness v2 的 claim support rate 为 1.000、false answer rate 为 0.000、claim coverage 为 0.8333。Alembic upgrade/check 已通过。浏览器 E2E 使用确定性 Provider、隔离的 `support_pilot_test` 数据库和 `log` 通知通道，不会调用付费模型或外部通知服务。
+当前验证结果为 154 项后端测试通过；16 项前端单元测试和 2 条浏览器 E2E（企业登录闭环 + 工单闭环）已在本机复跑通过；80 场景 deterministic Agent 评测 80/80；faithfulness v2 的 claim support rate 为 1.000、false answer rate 为 0.000、claim coverage 为 0.8333。Alembic upgrade/check 已通过。浏览器 E2E 使用确定性 Provider、隔离的 `support_pilot_test` 数据库和 `log` 通知通道，不会调用付费模型或外部通知服务。
 
 ## 验证
 
@@ -302,3 +304,8 @@ npm run test:e2e
 - [OIDC 登录与身份绑定 ADR](./docs/adr/0018-oidc-login-and-identity-linking.md)
 - [第十九阶段 OIDC 评测](./docs/evaluation/stage-19-oidc-evaluation.md)
 - [第十九阶段学习说明](./docs/learning/stage-19-oidc-login.md)
+- [第二十阶段指标后端验收](./docs/product/stage-20-acceptance.md)
+- [指标后端与运维自动化 ADR](./docs/adr/0019-metrics-backend-and-ops-automation.md)
+- [第二十阶段指标评测](./docs/evaluation/stage-20-metrics-backend-evaluation.md)
+- [第二十阶段学习说明](./docs/learning/stage-20-metrics-backend.md)
+- [指标快照导出记录](./docs/evaluation/results/metrics-snapshot-2026-10-14.json)

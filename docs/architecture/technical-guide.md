@@ -42,6 +42,6 @@ LLM 只输出严格 Schema 的意图与参数候选，所有外部输入由 Pyda
 
 1. 与真实 IdP 联调（Keycloak/Auth0/企业微信），补上 RP-initiated logout、角色映射、JIT 建号策略与 MFA；
 2. 在现有两条浏览器 E2E 基础上增加多浏览器覆盖（Firefox/WebKit）与并发刷新、会话上限等边界用例；
-3. 把 OTel Collector 接到持久化后端（Tempo/Prometheus）、补充 Token/成本指标与告警规则。
+3. 把 OTel Collector 接到持久化后端（Tempo/长期存储）并补上 Grafana 看板与 Alertmanager 通知；当前已完成 Prometheus 导出端点、抓取配置与 5 条告警规则（见 ADR 0019）。
 
-已完成的配套改造：RAG calibration/holdout 分离与 claim 级忠实度评测、SSE 断线回放与前端自动恢复、工单队列游标分页、Agent checkpoint 恢复、历史保留清理、OTLP Trace+Metrics 与默认 dry-run 的维护脚本、浏览器端 HttpOnly Cookie 会话 + CSRF 双提交 + 刷新轮换（见 ADR 0016），会话列表/单个撤销/全部撤销与按保留期清理（见 ADR 0017），以及 OIDC 授权码 + PKCE 登录与按已验证邮箱绑定账号（见 ADR 0018）。
+已完成的配套改造：RAG calibration/holdout 分离与 claim 级忠实度评测、SSE 断线回放与前端自动恢复、工单队列游标分页、Agent checkpoint 恢复、历史保留清理、OTLP Trace+Metrics 与默认 dry-run 的维护脚本、浏览器端 HttpOnly Cookie 会话 + CSRF 双提交 + 刷新轮换（见 ADR 0016），会话列表/单个撤销/全部撤销与按保留期清理（见 ADR 0017），OIDC 授权码 + PKCE 登录与按已验证邮箱绑定账号（见 ADR 0018），以及指标导出端点、Prometheus 抓取/告警配置与维护计划任务脚本（见 ADR 0019）。

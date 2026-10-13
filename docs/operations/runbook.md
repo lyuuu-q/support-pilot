@@ -2,11 +2,20 @@
 
 ## 1. 启动 OTel Collector
 
-Collector 使用 Compose `observability` profile，默认只导出到 debug exporter，适合本地查看 Trace/Metric。
+Collector 使用 Compose `observability` profile：Trace 走 debug exporter（本地看日志），指标额外通过 Prometheus 导出端点暴露，供 Prometheus 抓取或脚本快照。
 
 ```powershell
 docker compose --profile observability up -d otel-collector
 ```
+
+同一个 profile 下还有 Prometheus（抓取 Collector 的指标并加载告警规则）：
+
+```powershell
+docker compose --profile observability up -d prometheus
+# Prometheus UI: http://127.0.0.1:9090
+```
+
+不启动 Prometheus 也能取指标——Collector 已把指标以 Prometheus 文本格式暴露在 `http://127.0.0.1:8889/metrics`。
 
 启用 API 埋点：
 
@@ -38,6 +47,23 @@ http://host.docker.internal:4318/v1/metrics
 - `agent.retention.prune`：一次历史清理。
 
 ## 3. 关键指标
+
+应用埋点使用点号命名；Prometheus 导出时点号转下划线，counter 追加 `_total`，histogram 追加单位与 `_bucket/_sum/_count`。例如：
+
+| 应用埋点 | Prometheus 中的名字 |
+|---|---|
+| `support_pilot.agent.runs` | `support_pilot_agent_runs_total` |
+| `support_pilot.agent.duration_ms` | `support_pilot_agent_duration_ms_milliseconds_bucket` |
+| `support_pilot.rag.searches` | `support_pilot_rag_searches_total` |
+| `support_pilot.auth.sessions_revoked` | `support_pilot_auth_sessions_revoked_total` |
+
+生成一份可提交的指标快照（无需 Prometheus）：
+
+```powershell
+uv run python scripts/metrics_snapshot.py --output docs/evaluation/results/metrics-snapshot-<日期>.json
+```
+
+告警规则在 `ops/alerting-rules.yml`，覆盖 Agent 失败率、Agent p95 延迟、检索不可回答比例、会话撤销激增与"清理未执行"。
 
 - `support_pilot.agent.runs`
 - `support_pilot.agent.duration_ms`
@@ -83,7 +109,15 @@ uv run python scripts/prune_auth_sessions.py
 
 日志写入被 Git 忽略的 `logs/`。
 
-Windows Task Scheduler 可创建每日任务，操作使用：
+Windows 计划任务可以用脚本注册（需要管理员权限的 PowerShell）：
+
+```powershell
+.\scripts\register_maintenance_task.ps1                 # 默认每日 03:30
+.\scripts\register_maintenance_task.ps1 -At 04:15
+.\scripts\register_maintenance_task.ps1 -Remove
+```
+
+等价的 Task Scheduler 操作是：
 
 ```text
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File <repo>\scripts\run_maintenance.ps1 -Execute

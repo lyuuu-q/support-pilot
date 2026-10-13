@@ -45,6 +45,8 @@
 | 122 tests | 2026-10-13 全量 pytest 记录 | 新增观测与清理测试，仍为合成数据 |
 | Agent/RAG Span 与指标 | `tests/integration/test_observability.py` | InMemory exporter，非生产流量 |
 | Collector 40 spans / 10 metrics | 本机 otel-collector debug 日志 | 仅 debug exporter，无持久化或查询后端 |
+| 154 tests | 2026-10-14 全量 pytest 记录 | 含 5 项观测配置一致性测试 |
+| 指标导出记录 114 序列 / 13 指标族 | `docs/evaluation/results/metrics-snapshot-2026-10-14.json` | 合成流量、本机单实例；Prometheus 容器未在本机启动 |
 | 127 tests | 2026-10-13 全量 pytest 记录 | 含 5 项 Cookie/CSRF 会话测试，合成数据 |
 | Cookie 会话与 CSRF | `tests/integration/test_auth_session_api.py` | 本地 HTTP、`auth_cookie_secure=false`，非 HTTPS 部署验证 |
 | 浏览器 E2E（Cookie 会话闭环） | Playwright 自带 Chromium v1243（本地缓存路径） | 单浏览器、本机确定性 Provider，与 CI 浏览器一致 |
@@ -70,5 +72,6 @@
 - 不声称已接入真实企业身份系统——只有本地开发用 IdP 与假 IdP 测试，未联调 Keycloak/Auth0/企业微信；
 - 不声称会话管理达到生产设备管理能力——没有 IP、设备指纹、活跃会话数量上限与自动调度；
 - 不声称 Cookie 会话已通过生产安全评审——没有设备列表、撤销全部会话、OIDC 和 HTTPS Cookie 的实测；
+- 不声称具备生产监控能力——只有 Prometheus 导出端点、抓取配置与 5 条告警规则，无长期存储、看板与通知链路，且 Prometheus 容器未在本机验证过抓取；
 - 不声称已接入生产监控、告警或 SLO——Collector 当前只有 debug exporter，指标来自本机合成流量；
 - 不声称"防住所有 Prompt Injection"——当前是规则预检、证据扫描和工具隔离的 MVP 防线。

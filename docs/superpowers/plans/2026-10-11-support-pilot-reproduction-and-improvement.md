@@ -206,7 +206,7 @@
 
 - [ ] 工单游标分页、搜索和状态筛选；
 - [ ] SSE 断线重连、事件去重和取消；
-- [ ] Playwright 覆盖 Chromium、Firefox、WebKit；
+- [x] ~~Playwright 覆盖 Chromium、Firefox、WebKit~~：**决定不做**（2026-10-14）。理由：本机浏览器 CDN 按地区封锁无法获取；Windows 上的 WebKit 并非 Safari，信号价值低；SSE/Cookie/OIDC 关键路径已由 Chromium 真实浏览器用例 + 后端测试覆盖。保留 Chromium 与系统浏览器通道。
 - [ ] 增加反馈流转和人工接管的可视化回归；
 - [ ] 如需实时队列，优先复用 SSE，不提前引入消息队列。
 

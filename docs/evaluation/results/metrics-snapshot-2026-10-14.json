@@ -1,0 +1,1052 @@
+{
+  "endpoint": "http://127.0.0.1:8889/metrics",
+  "captured_at": "2026-10-13T17:30:59.744281+00:00",
+  "metric_families": {
+    "support_pilot_agent_duration_ms_milliseconds_bucket": {
+      "samples": 32,
+      "values": [
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "0"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "5"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "10"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "25"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "50"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "75"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "100"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "250"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "500"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "750"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "1000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "2500"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "5000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "7500"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "10000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "+Inf"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "0"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "5"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "10"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "25"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "50"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "75"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "100"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "250"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "500"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "750"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "1000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "2500"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "5000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "7500"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "10000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1",
+            "le": "+Inf"
+          },
+          "value": 1.0
+        }
+      ]
+    },
+    "support_pilot_agent_duration_ms_milliseconds_count": {
+      "samples": 2,
+      "values": [
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1"
+          },
+          "value": 1.0
+        }
+      ]
+    },
+    "support_pilot_agent_duration_ms_milliseconds_sum": {
+      "samples": 2,
+      "values": [
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1"
+          },
+          "value": 788.0083999916678
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1"
+          },
+          "value": 576.4250999927754
+        }
+      ]
+    },
+    "support_pilot_agent_runs_total": {
+      "samples": 2,
+      "values": [
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "intent": "knowledge",
+            "outcome": "answered",
+            "provider": "deterministic",
+            "risk_level": "R1"
+          },
+          "value": 1.0
+        }
+      ]
+    },
+    "support_pilot_auth_sessions_revoked_total": {
+      "samples": 1,
+      "values": [
+        {
+          "labels": {
+            "reason": "logout_all"
+          },
+          "value": 1.0
+        }
+      ]
+    },
+    "support_pilot_auth_sessions_started_total": {
+      "samples": 1,
+      "values": [
+        {
+          "labels": {},
+          "value": 1.0
+        }
+      ]
+    },
+    "support_pilot_rag_hit_count_bucket": {
+      "samples": 32,
+      "values": [
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "0"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "5"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "10"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "25"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "50"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "75"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "100"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "250"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "500"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "750"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "1000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "2500"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "5000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "7500"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "10000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "+Inf"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "0"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "5"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "10"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "25"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "50"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "75"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "100"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "250"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "500"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "750"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "1000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "2500"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "5000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "7500"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "10000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "+Inf"
+          },
+          "value": 1.0
+        }
+      ]
+    },
+    "support_pilot_rag_hit_count_count": {
+      "samples": 2,
+      "values": [
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence"
+          },
+          "value": 1.0
+        }
+      ]
+    },
+    "support_pilot_rag_hit_count_sum": {
+      "samples": 2,
+      "values": [
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence"
+          },
+          "value": 5.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence"
+          },
+          "value": 5.0
+        }
+      ]
+    },
+    "support_pilot_rag_search_duration_ms_milliseconds_bucket": {
+      "samples": 32,
+      "values": [
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "0"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "5"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "10"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "25"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "50"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "75"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "100"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "250"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "500"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "750"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "1000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "2500"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "5000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "7500"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "10000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "+Inf"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "0"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "5"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "10"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "25"
+          },
+          "value": 0.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "50"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "75"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "100"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "250"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "500"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "750"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "1000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "2500"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "5000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "7500"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "10000"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence",
+            "le": "+Inf"
+          },
+          "value": 1.0
+        }
+      ]
+    },
+    "support_pilot_rag_search_duration_ms_milliseconds_count": {
+      "samples": 2,
+      "values": [
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence"
+          },
+          "value": 1.0
+        }
+      ]
+    },
+    "support_pilot_rag_search_duration_ms_milliseconds_sum": {
+      "samples": 2,
+      "values": [
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence"
+          },
+          "value": 52.24409999209456
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence"
+          },
+          "value": 38.20660000201315
+        }
+      ]
+    },
+    "support_pilot_rag_searches_total": {
+      "samples": 2,
+      "values": [
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence"
+          },
+          "value": 1.0
+        },
+        {
+          "labels": {
+            "answerable": "true",
+            "reason": "sufficient_evidence"
+          },
+          "value": 1.0
+        }
+      ]
+    }
+  },
+  "totals": {
+    "support_pilot_agent_duration_ms_milliseconds_bucket": 13.0,
+    "support_pilot_agent_duration_ms_milliseconds_count": 2.0,
+    "support_pilot_agent_duration_ms_milliseconds_sum": 1364.4335,
+    "support_pilot_agent_runs_total": 2.0,
+    "support_pilot_auth_sessions_revoked_total": 1.0,
+    "support_pilot_auth_sessions_started_total": 1.0,
+    "support_pilot_rag_hit_count_bucket": 30.0,
+    "support_pilot_rag_hit_count_count": 2.0,
+    "support_pilot_rag_hit_count_sum": 10.0,
+    "support_pilot_rag_search_duration_ms_milliseconds_bucket": 23.0,
+    "support_pilot_rag_search_duration_ms_milliseconds_count": 2.0,
+    "support_pilot_rag_search_duration_ms_milliseconds_sum": 90.4507,
+    "support_pilot_rag_searches_total": 2.0
+  }
+}
