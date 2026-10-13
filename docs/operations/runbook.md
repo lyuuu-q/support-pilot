@@ -92,4 +92,4 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File <repo>\scripts\run_maint
 - Collector 无输出：确认 `SUPPORT_PILOT_OTEL_ENABLED=true` 且端点正确；
 - 数据库连接失败：确认 `postgres`/`postgres-test` 容器 healthy；
 - 清理脚本失败：先用默认 dry-run 检查，不要在保留期不确定时直接执行；
-- 浏览器 E2E 无法启动：若 Playwright 自带 Chromium 下载失败，可设置 `E2E_BROWSER_CHANNEL=chrome`（或 `msedge`）使用系统浏览器，此时录屏会被关闭。
+- 浏览器 E2E 无法启动：先用 `PLAYWRIGHT_BROWSERS_PATH` 指向已有缓存（本机为 `C:\Users\刘雨晴\Documents\github\.playwright-browsers`）；确实没有缓存且下载被阻断时，再设置 `E2E_BROWSER_CHANNEL=chrome`（或 `msedge`）使用系统浏览器，此时录屏会被关闭。

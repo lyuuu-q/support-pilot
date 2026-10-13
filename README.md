@@ -190,6 +190,7 @@ Set-Location frontend
 npm run lint
 npm run test
 npm run build
+$env:PLAYWRIGHT_BROWSERS_PATH = 'C:\Users\刘雨晴\Documents\github\.playwright-browsers'
 npx playwright install chromium
 npm run test:e2e
 

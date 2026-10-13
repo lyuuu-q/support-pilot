@@ -3,7 +3,7 @@
 - 运行时间：2026-10-13（Asia/Shanghai）
 - 数据库：PostgreSQL 16 + pgvector（localhost:54329 / 54330，已应用迁移 0012）
 - 数据性质：合成用户与合成工单，不是生产流量
-- 浏览器：系统安装的 Google Chrome（Playwright `channel: chrome`）
+- 浏览器：Playwright 自带 Chromium v1243（与 CI 一致），缓存路径 `C:\Users\刘雨晴\Documents\github\.playwright-browsers`
 
 ## 验证结果
 
@@ -40,10 +40,11 @@
 
 ## 环境限制与处理
 
-- 本机浏览器缓存目录（`D:\model-cache`）已不存在，Playwright 自带 Chromium 需要联网下载；
-- `cdn.playwright.dev` 对本机所在区域返回 403 `AccessDenied`（not available in your location），无法下载 Chromium 与 ffmpeg；
-- 因此改用 `E2E_BROWSER_CHANNEL=chrome` 走系统安装的 Chrome（同为 Chromium 内核），并在该通道下关闭录屏（录屏依赖 Playwright 自带的 ffmpeg）；
-- CI 仍使用 Playwright 自带 Chromium，本机结果只代表"该系统 Chrome 版本 + 本地确定性 Provider"的可复现性。
+- README 里旧的浏览器缓存路径（`D:\model-cache`）在本机已不存在，直接运行会提示缺少 `chromium_headless_shell-1243`；
+- 重新下载时 `cdn.playwright.dev` 对本机所在区域返回 403 `AccessDenied`（not available in your location），Chromium 与 ffmpeg 都拉不下来；
+- 实际可用的浏览器缓存位于工作区内 `C:\Users\刘雨晴\Documents\github\.playwright-browsers`（含 `chromium_headless_shell-1243`、`chromium-1243`、`ffmpeg-1011`），通过 `PLAYWRIGHT_BROWSERS_PATH` 指向它即可运行，浏览器版本与 CI 一致；
+- 兜底方案：无本地缓存时可设置 `E2E_BROWSER_CHANNEL=chrome`（或 `msedge`）改用系统浏览器，该通道下自动关闭录屏；
+- 沙箱环境启动浏览器还需要额外授权，否则 Playwright 会静默挂起而不报错。
 
 ## 边界
 

@@ -45,7 +45,7 @@
 | Collector 40 spans / 10 metrics | 本机 otel-collector debug 日志 | 仅 debug exporter，无持久化或查询后端 |
 | 127 tests | 2026-10-13 全量 pytest 记录 | 含 5 项 Cookie/CSRF 会话测试，合成数据 |
 | Cookie 会话与 CSRF | `tests/integration/test_auth_session_api.py` | 本地 HTTP、`auth_cookie_secure=false`，非 HTTPS 部署验证 |
-| 浏览器 E2E（Cookie 会话闭环） | Playwright + 系统 Chrome 通道 | 单浏览器、本机确定性 Provider，CI 仍用自带 Chromium |
+| 浏览器 E2E（Cookie 会话闭环） | Playwright 自带 Chromium v1243（本地缓存路径） | 单浏览器、本机确定性 Provider，与 CI 浏览器一致 |
 
 ## 演示顺序（5–7 分钟）
 
