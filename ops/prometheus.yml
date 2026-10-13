@@ -1,0 +1,13 @@
+# Prometheus 配置：抓取 OTel Collector 导出的应用指标并加载告警规则。
+# 使用方式见 docs/operations/runbook.md 第 1 节。
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alerting-rules.yml
+
+scrape_configs:
+  - job_name: otel-collector
+    static_configs:
+      - targets: ["otel-collector:8889"]

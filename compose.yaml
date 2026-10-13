@@ -72,6 +72,21 @@ services:
       - ./ops/otel-collector.yaml:/etc/otelcol/config.yaml:ro
     ports:
       - "4318:4318"
+      - "8889:8889"
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    profiles: ["observability"]
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    volumes:
+      - ./ops/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./ops/alerting-rules.yml:/etc/prometheus/alerting-rules.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - otel-collector
 
 volumes:
   support_pilot_postgres_data:

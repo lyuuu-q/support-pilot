@@ -1,0 +1,69 @@
+# SupportPilot 告警规则。
+# 指标来自应用 OTLP 埋点，经 Collector 的 Prometheus 导出端点暴露：
+#   - 点号转下划线；
+#   - counter 追加 _total；
+#   - histogram 追加单位后缀与 _bucket/_sum/_count（例如 agent.duration_ms(ms)
+#     导出为 support_pilot_agent_duration_ms_milliseconds_bucket）。
+groups:
+  - name: support-pilot-agent
+    rules:
+      - alert: SupportPilotAgentFailureRatioHigh
+        expr: |
+          sum(rate(support_pilot_agent_runs_total{outcome="failed"}[5m]))
+            / clamp_min(sum(rate(support_pilot_agent_runs_total[5m])), 0.0001) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent 运行失败比例超过 10%"
+          description: "先看 agent.run Span 的 exception 事件，再确认 Provider 与数据库是否可用。"
+
+      - alert: SupportPilotAgentLatencyP95High
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(support_pilot_agent_duration_ms_milliseconds_bucket[5m])) by (le)
+          ) > 5000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent 运行 p95 延迟超过 5 秒"
+          description: "结合 checkpoint 恢复与 Provider 超时设置排查。"
+
+  - name: support-pilot-rag
+    rules:
+      - alert: SupportPilotAnswerabilityDrop
+        expr: |
+          sum(rate(support_pilot_rag_searches_total{answerable="false"}[10m]))
+            / clamp_min(sum(rate(support_pilot_rag_searches_total[10m])), 0.0001) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "超过一半检索判定为不可回答"
+          description: "检查 rag.retrieval Span 的 reason 标签分布，通常是知识库缺失或摄取失败。"
+
+  - name: support-pilot-auth
+    rules:
+      - alert: SupportPilotSessionRevocationSpike
+        expr: increase(support_pilot_auth_sessions_revoked_total[15m]) > 20
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "15 分钟内会话撤销次数异常"
+          description: "按 reason 标签区分 logout / owner / logout_all；logout_all 激增可能是账号失陷响应。"
+
+  - name: support-pilot-maintenance
+    rules:
+      - alert: SupportPilotRetentionPruneMissing
+        expr: |
+          increase(support_pilot_retention_deleted_runs_total[26h]) == 0
+            and increase(support_pilot_auth_sessions_pruned_total[26h]) == 0
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "超过 26 小时没有看到保留清理执行"
+          description: "确认计划任务（scripts/register_maintenance_task.ps1）或 run_maintenance.ps1 是否仍在运行。"
