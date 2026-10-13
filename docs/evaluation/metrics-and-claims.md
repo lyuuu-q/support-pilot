@@ -20,6 +20,7 @@
 - SSE progress/result 事件按 run_id + sequence 持久化，所有者可通过回放 API 读取断线前事件，为 Last-Event-ID 续传提供基础。
 - 前端在 SSE 网络中断后自动回放已发生事件并调用 checkpoint 恢复接口，无需用户重新提交。
 - 恢复使用 PostgreSQL 行锁和 resuming 状态防止并发重复执行；提供带 dry-run 的历史清理脚本，保留活跃运行及其事件。
+- 在 OTLP Trace 之外增加 Metrics：Agent、RAG 与历史清理产生有界标签的 counter/histogram，并提供 Compose `observability` profile 的 Collector（当前仅 debug exporter）与默认 dry-run 的维护脚本。
 
 ## 指标证据索引
 
@@ -38,6 +39,9 @@
 | checkpoint 80/80 / p50 698ms | `docs/evaluation/results/agent-scenarios-v1-checkpoint.json` | deterministic、本地单机，延迟换可恢复性 |
 | SSE 回放 sequence 连续 / 越权 404 | `docs/evaluation/stage-13-sse-event-replay-evaluation.md` | 服务端回放，前端自动续传未实现 |
 | Compose runtime | `main@7007b49` container job | CI runner 短时启动与探活，不代表生产稳定性 |
+| 122 tests | 2026-10-13 全量 pytest 记录 | 新增观测与清理测试，仍为合成数据 |
+| Agent/RAG Span 与指标 | `tests/integration/test_observability.py` | InMemory exporter，非生产流量 |
+| Collector 40 spans / 10 metrics | 本机 otel-collector debug 日志 | 仅 debug exporter，无持久化或查询后端 |
 
 ## 演示顺序（5–7 分钟）
 
@@ -52,4 +56,5 @@
 - 不声称"服务真实企业客户""线上准确率 98.75%""生产节省多少人力"；
 - 不把 Qwen macro-F1 写成 1.0——1.0 属于确定性 80 场景，Qwen 只有 7 条冒烟；
 - 不声称"已经生产部署"——GitHub Actions 已验证镜像构建、整套 Compose 启动与短时探活，但未验证生产配置、容量、可用性或长期稳定性；
+- 不声称已接入生产监控、告警或 SLO——Collector 当前只有 debug exporter，指标来自本机合成流量；
 - 不声称"防住所有 Prompt Injection"——当前是规则预检、证据扫描和工具隔离的 MVP 防线。

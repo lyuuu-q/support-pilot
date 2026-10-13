@@ -142,13 +142,33 @@ uv run python scripts/evaluate_faithfulness.py
 
 可通过 `SUPPORT_PILOT_MODEL_CACHE_DIR` 覆盖模型目录。真实模型首次下载和 CPU 重排较慢；确定性 Provider 只用于 CI 和流程回归。
 
+## 可观测性与定时维护
+
+设置 `SUPPORT_PILOT_OTEL_ENABLED=true` 后，API 会同时导出 Trace 和 Metrics 到 OTLP HTTP 端点；未启用时埋点为 no-op。本地可用 Compose `observability` profile 启动 Collector 查看信号：
+
+```powershell
+docker compose --profile observability up -d otel-collector
+docker compose --profile observability logs -f otel-collector
+```
+
+Agent、RAG 与历史清理提供 `agent.run`、`agent.resume`、`rag.retrieval`、`agent.retention.prune` 四个 Span 和对应的 counter/histogram 指标，标签只使用有界枚举。当前 Collector 只配置 debug exporter，用于本地验证链路，不接 Jaeger/Prometheus，也不代表生产监控或 SLO。
+
+历史清理通过维护脚本执行，默认 dry-run：
+
+```powershell
+.\scripts\run_maintenance.ps1
+.\scripts\run_maintenance.ps1 -Execute
+```
+
+日志写入被忽略的 `logs/`。完整命令、Span/指标清单与排障见[运维手册](./docs/operations/runbook.md)。
+
 ## 工单通知与验证边界
 
 创建工单的数据库事务提交后，系统通过可配置的 `OutboundChannel` 发送通知；通知失败只记录公开工单号，不回滚已经创建的工单，使用同一幂等键重放也不会重复投递。默认 `log` 通道无需外部服务；`smtp` 和 `webhook` 通过 `.env` 中的 `SUPPORT_PILOT_NOTIFICATION_CHANNEL` 切换。
 
 SMTP 密码与 Webhook URL 使用 `SecretStr` 保存；认证 SMTP 强制启用证书和主机名校验，Webhook 强制 HTTPS、显式主机白名单并拒绝非公网 IP 与环境代理。自动化测试只使用 Mock/Fake 外部边界，不代表真实邮件或群机器人已经完成线上投递验证。
 
-当前验证结果为 121 项后端测试（覆盖率 93%）通过；10 项前端单元测试和 1 条 Chromium 业务 E2E 已在本机复跑通过；80 场景 deterministic Agent 评测 80/80；faithfulness v2 的 claim support rate 为 1.000、false answer rate 为 0.000、claim coverage 为 0.8333。Alembic upgrade/check 已通过。浏览器 E2E 使用确定性 Provider、隔离的 `support_pilot_test` 数据库和 `log` 通知通道，不会调用付费模型或外部通知服务。
+当前验证结果为 122 项后端测试通过；10 项前端单元测试和 1 条 Chromium 业务 E2E 已在本机复跑通过；80 场景 deterministic Agent 评测 80/80；faithfulness v2 的 claim support rate 为 1.000、false answer rate 为 0.000、claim coverage 为 0.8333。Alembic upgrade/check 已通过。浏览器 E2E 使用确定性 Provider、隔离的 `support_pilot_test` 数据库和 `log` 通知通道，不会调用付费模型或外部通知服务。
 
 ## 验证
 
@@ -236,3 +256,8 @@ npm run test:e2e
 - [历史保留与恢复锁 ADR](./docs/adr/0014-agent-history-retention-and-resume-guard.md)
 - [第十五阶段清理评测](./docs/evaluation/stage-15-retention-and-resume-guard-evaluation.md)
 - [第十五阶段学习说明](./docs/learning/stage-15-retention-and-resume-guard.md)
+- [第十六阶段可观测性与维护验收](./docs/product/stage-16-acceptance.md)
+- [OTLP 指标与定时维护 ADR](./docs/adr/0015-otel-metrics-and-scheduled-maintenance.md)
+- [第十六阶段可观测性评测](./docs/evaluation/stage-16-observability-evaluation.md)
+- [第十六阶段学习说明](./docs/learning/stage-16-observability-and-maintenance.md)
+- [运维手册](./docs/operations/runbook.md)
