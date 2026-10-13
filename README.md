@@ -196,6 +196,27 @@ SMTP 密码与 Webhook URL 使用 `SecretStr` 保存；认证 SMTP 强制启用�
 
 当前验证结果为 154 项后端测试通过；16 项前端单元测试和 2 条浏览器 E2E（企业登录闭环 + 工单闭环）已在本机复跑通过；80 场景 deterministic Agent 评测 80/80；faithfulness v2 的 claim support rate 为 1.000、false answer rate 为 0.000、claim coverage 为 0.8333。Alembic upgrade/check 已通过。浏览器 E2E 使用确定性 Provider、隔离的 `support_pilot_test` 数据库和 `log` 通知通道，不会调用付费模型或外部通知服务。
 
+## 我在这个项目里的增量（相对上游）
+
+上游 `EthanZ-zh/support-pilot`（基线 `d4d65b4`）已经包含完整的确定性业务基线、混合 RAG、受控 Agent、JWT/工单闭环与容器交付（ADR 0001–0007）。本仓库在复现并核验这些能力之后，新增了 **ADR 0008–0019**：
+
+| ADR | 增量 | 关键证据 |
+|---|---|---|
+| 0008 | claim 级引用与忠实度 v2（独立数据集 + 确定性 verifier） | support 1.000 / false answer 0.000 / coverage 0.8333 |
+| 0009 | 浏览器中止 SSE 等待，重试复用同一幂等键 | 中止与重试集成测试 |
+| 0010 | 工单队列游标分页与搜索 | 分页与筛选测试 |
+| 0011 | Agent 运行级 checkpoint 与中断恢复 | 80/80 场景，p50 698 ms |
+| 0012 | SSE 事件按 run 持久化并支持回放 | sequence 连续、越权 404 |
+| 0013 | 前端断线自动回放 + checkpoint 恢复 | 组件测试 + 浏览器用例 |
+| 0014 | 历史保留清理 + 恢复并发锁（stale 恢复） | 清理与并发恢复测试 |
+| 0015 | OTLP 指标埋点 + 默认 dry-run 的维护脚本与 Runbook | Collector 收到 40 spans / 10 metrics |
+| 0016 | HttpOnly Cookie 会话 + CSRF 双提交 + refresh 轮换 | 会话/CSRF/重放测试 |
+| 0017 | 会话列表、单个撤销、全部撤销与保留清理 | 管理与清理测试 |
+| 0018 | OIDC 授权码 + PKCE 登录与按已验证邮箱绑定账号 | 13 项 OIDC 测试 + 浏览器登录闭环 |
+| 0019 | 指标导出端点、Prometheus 抓取与告警规则、运维脚本 | 114 序列导出记录 + 配置一致性测试 |
+
+复现的实测记录见[复现记录](./docs/evaluation/reproduction-2026-10-12-fullstack.md)，当前验证口径见[最终证据快照](./docs/evaluation/final-evidence.md)；上游原有能力（ADR 0001–0007）在本轮只做复现核验，未改写其设计。
+
 ## 验证
 
 ```powershell
@@ -309,3 +330,4 @@ npm run test:e2e
 - [第二十阶段指标评测](./docs/evaluation/stage-20-metrics-backend-evaluation.md)
 - [第二十阶段学习说明](./docs/learning/stage-20-metrics-backend.md)
 - [指标快照导出记录](./docs/evaluation/results/metrics-snapshot-2026-10-14.json)
+- [复现与完善计划（含收尾说明）](./docs/superpowers/plans/2026-10-11-support-pilot-reproduction-and-improvement.md)
