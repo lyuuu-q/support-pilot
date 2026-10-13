@@ -15,6 +15,11 @@ class AuthorizationError(DomainError):
     code = "tenant_access_denied"
 
 
+class CsrfError(DomainError):
+    status_code = 403
+    code = "csrf_token_invalid"
+
+
 class ResourceNotFoundError(DomainError):
     status_code = 404
     code = "resource_not_found"

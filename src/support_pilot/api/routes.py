@@ -1,9 +1,9 @@
 import json
 from collections.abc import Iterator
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Header, Query
+from fastapi import APIRouter, Header, Query, Request, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 
@@ -19,11 +19,28 @@ from support_pilot.api.dependencies import CurrentUserDep, SessionDep
 from support_pilot.api.schemas import ErrorResponse
 from support_pilot.application.contracts import SupportInput, SupportResponse
 from support_pilot.application.services import SupportService
-from support_pilot.auth.contracts import CurrentUserResponse, LoginRequest, TokenResponse
-from support_pilot.auth.service import authenticate_user, issue_access_token
+from support_pilot.auth.contracts import (
+    CurrentUserResponse,
+    LoginRequest,
+    LoginResponse,
+    TokenResponse,
+)
+from support_pilot.auth.service import authenticate_user, issue_access_token, record_auth_event
+from support_pilot.auth.sessions import (
+    IssuedSession,
+    find_active_session,
+    lookup_session,
+    revoke_session,
+    rotate_session,
+    start_session,
+    verify_csrf,
+)
 from support_pilot.channels.factory import get_outbound_channel
+from support_pilot.config import get_settings
 from support_pilot.domain.enums import TicketStatus
-from support_pilot.domain.errors import DomainError
+from support_pilot.domain.errors import AuthenticationError, DomainError
+from support_pilot.infrastructure.models import UserAccount
+from support_pilot.infrastructure.repositories import SupportRepository
 from support_pilot.rag.contracts import KnowledgeSearchInput, KnowledgeSearchResponse
 from support_pilot.rag.providers.factory import get_provider_bundle
 from support_pilot.rag.retrieval import HybridRetrievalService
@@ -47,26 +64,175 @@ def _sse_event(event: str, payload: Any, *, event_id: str | None = None) -> str:
     return f"{id_line}event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
+COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
+
+
+def _current_user_response(user: UserAccount) -> CurrentUserResponse:
+    return CurrentUserResponse(
+        id=user.id,
+        tenant_id=user.tenant_id,
+        email=user.email,
+        display_name=user.display_name,
+        role=user.role,
+    )
+
+
+def _set_session_cookies(
+    response: Response,
+    *,
+    access_token: str,
+    material: IssuedSession,
+) -> None:
+    settings = get_settings()
+    refresh_max_age = settings.auth_refresh_token_days * 86_400
+    response.set_cookie(
+        settings.auth_access_cookie,
+        access_token,
+        max_age=settings.jwt_access_token_minutes * 60,
+        httponly=True,
+        secure=settings.auth_cookie_secure,
+        samesite=COOKIE_SAMESITE,
+        path="/",
+    )
+    response.set_cookie(
+        settings.auth_refresh_cookie,
+        material.refresh_token,
+        max_age=refresh_max_age,
+        httponly=True,
+        secure=settings.auth_cookie_secure,
+        samesite=COOKIE_SAMESITE,
+        path=settings.auth_refresh_cookie_path,
+    )
+    response.set_cookie(
+        settings.auth_csrf_cookie,
+        material.csrf_token,
+        max_age=refresh_max_age,
+        httponly=False,
+        secure=settings.auth_cookie_secure,
+        samesite=COOKIE_SAMESITE,
+        path="/",
+    )
+
+
+def _clear_session_cookies(response: Response) -> None:
+    settings = get_settings()
+    response.delete_cookie(
+        settings.auth_access_cookie,
+        path="/",
+        httponly=True,
+        secure=settings.auth_cookie_secure,
+        samesite=COOKIE_SAMESITE,
+    )
+    response.delete_cookie(
+        settings.auth_refresh_cookie,
+        path=settings.auth_refresh_cookie_path,
+        httponly=True,
+        secure=settings.auth_cookie_secure,
+        samesite=COOKIE_SAMESITE,
+    )
+    response.delete_cookie(
+        settings.auth_csrf_cookie,
+        path="/",
+        httponly=False,
+        secure=settings.auth_cookie_secure,
+        samesite=COOKIE_SAMESITE,
+    )
+
+
 @router.post(
     "/auth/login",
-    response_model=TokenResponse,
+    response_model=TokenResponse | LoginResponse,
     responses={401: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
     tags=["auth"],
 )
-def login(request: LoginRequest, session: SessionDep) -> TokenResponse:
+def login(
+    request: LoginRequest, response: Response, session: SessionDep
+) -> TokenResponse | LoginResponse:
+    """Authenticate, then either start a cookie session or mint a bearer token."""
+
+    settings = get_settings()
     user = authenticate_user(session, email=request.email, password=request.password)
-    return issue_access_token(user)
+    if request.session_mode == "token":
+        return issue_access_token(user, settings=settings)
+    row, material = start_session(session, user, settings=settings)
+    token = issue_access_token(user, settings=settings, session_id=row.id)
+    session.commit()
+    _set_session_cookies(response, access_token=token.access_token, material=material)
+    return LoginResponse(
+        user=_current_user_response(user),
+        csrf_token=material.csrf_token,
+        expires_in=token.expires_in,
+    )
+
+
+@router.post(
+    "/auth/refresh",
+    response_model=LoginResponse,
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+    tags=["auth"],
+)
+def refresh_session(request: Request, response: Response, session: SessionDep) -> LoginResponse:
+    """Rotate the refresh token and hand the browser a fresh cookie pair."""
+
+    settings = get_settings()
+    refresh_token = request.cookies.get(settings.auth_refresh_cookie)
+    previous = find_active_session(session, refresh_token)
+    verify_csrf(
+        previous,
+        header_value=request.headers.get(settings.auth_csrf_header),
+        cookie_value=request.cookies.get(settings.auth_csrf_cookie),
+        method=request.method,
+    )
+    user = SupportRepository(session).get_user(previous.user_id)
+    if user is None:
+        raise AuthenticationError("refresh session user no longer exists")
+    row, material = rotate_session(session, refresh_token, settings=settings)
+    token = issue_access_token(user, settings=settings, session_id=row.id)
+    session.commit()
+    _set_session_cookies(response, access_token=token.access_token, material=material)
+    return LoginResponse(
+        user=_current_user_response(user),
+        csrf_token=material.csrf_token,
+        expires_in=token.expires_in,
+    )
+
+
+@router.post(
+    "/auth/logout",
+    status_code=204,
+    responses={403: {"model": ErrorResponse}},
+    tags=["auth"],
+)
+def logout(request: Request, session: SessionDep) -> Response:
+    """Revoke the presented session and clear every session cookie."""
+
+    settings = get_settings()
+    row = lookup_session(session, request.cookies.get(settings.auth_refresh_cookie))
+    if row is not None:
+        verify_csrf(
+            row,
+            header_value=request.headers.get(settings.auth_csrf_header),
+            cookie_value=request.cookies.get(settings.auth_csrf_cookie),
+            method=request.method,
+        )
+        if revoke_session(session, session_id=row.id) is not None:
+            session.commit()
+            record_auth_event(
+                session,
+                actor_id=str(row.user_id),
+                outcome="success",
+                reason_code="session_revoked",
+                action="auth.session.revoke",
+                resource_id=str(row.id),
+            )
+    response = Response(status_code=204)
+    _clear_session_cookies(response)
+    return response
 
 
 @router.get("/auth/me", response_model=CurrentUserResponse, tags=["auth"])
 def current_user(actor: CurrentUserDep) -> CurrentUserResponse:
-    return CurrentUserResponse(
-        id=actor.id,
-        tenant_id=actor.tenant_id,
-        email=actor.email,
-        display_name=actor.display_name,
-        role=actor.role,
-    )
+    return _current_user_response(actor)
 
 
 @router.get("/tickets", response_model=TicketListResponse, tags=["tickets"])

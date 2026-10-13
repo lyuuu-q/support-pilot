@@ -13,6 +13,8 @@ class StrictAuthContract(BaseModel):
 class LoginRequest(StrictAuthContract):
     email: EmailStr
     password: str = Field(min_length=8, max_length=200)
+    # Browsers use cookie sessions; scripts and API clients may opt into a bearer token.
+    session_mode: Literal["cookie", "token"] = "cookie"
 
 
 class TokenResponse(StrictAuthContract):
@@ -27,3 +29,9 @@ class CurrentUserResponse(StrictAuthContract):
     email: EmailStr
     display_name: str
     role: UserRole
+
+
+class LoginResponse(StrictAuthContract):
+    user: CurrentUserResponse
+    csrf_token: str
+    expires_in: int

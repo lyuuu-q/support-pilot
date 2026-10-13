@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     jwt_audience: str = "support-pilot-api"
     jwt_access_token_minutes: int = Field(default=30, ge=5, le=1440)
     allow_legacy_user_header: bool = False
+    auth_access_cookie: str = "support_pilot_access"
+    auth_refresh_cookie: str = "support_pilot_refresh"
+    auth_csrf_cookie: str = "support_pilot_csrf"
+    auth_csrf_header: str = "X-CSRF-Token"
+    auth_refresh_cookie_path: str = "/api/v1/auth"
+    auth_cookie_secure: bool = False
+    auth_refresh_token_days: int = Field(default=14, ge=1, le=90)
     otel_enabled: bool = False
     otel_service_name: str = "support-pilot-api"
     otel_exporter_otlp_endpoint: str = "http://localhost:4318/v1/traces"

@@ -24,6 +24,7 @@ from support_pilot.infrastructure.seed import seed_synthetic_data  # noqa: E402
 from support_pilot.main import app  # noqa: E402
 
 PROJECT_TABLES = (
+    "auth_sessions",
     "human_feedback",
     "ticket_transitions",
     "agent_runs",

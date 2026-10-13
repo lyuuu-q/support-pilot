@@ -82,6 +82,29 @@ class UserAccount(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(20), nullable=False)
 
 
+class AuthSession(Base, TimestampMixin):
+    """Browser session backing the HttpOnly access/refresh cookie pair."""
+
+    __tablename__ = "auth_sessions"
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'revoked')", name="valid_status"),
+        Index("ix_auth_sessions_user_status", "user_id", "status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    csrf_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    rotated_from: Mapped[UUID | None] = mapped_column(ForeignKey("auth_sessions.id"))
+    user_agent: Mapped[str | None] = mapped_column(String(200))
+
+
 class Entitlement(Base, TimestampMixin):
     __tablename__ = "entitlements"
     __table_args__ = (

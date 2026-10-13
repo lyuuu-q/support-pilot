@@ -18,7 +18,7 @@ DEMO_PASSWORD = "SupportPilotDemo!2026"
 def _token(client: TestClient, email: str) -> str:
     response = client.post(
         "/api/v1/auth/login",
-        json={"email": email, "password": DEMO_PASSWORD},
+        json={"email": email, "password": DEMO_PASSWORD, "session_mode": "token"},
     )
     assert response.status_code == 200
     return response.json()["access_token"]

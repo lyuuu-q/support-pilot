@@ -22,6 +22,7 @@ def test_login_issues_short_lived_bearer_and_me_returns_identity(
         json={
             "email": "beta.developer@example.com",
             "password": DEMO_PASSWORD,
+            "session_mode": "token",
         },
     )
 
@@ -68,6 +69,7 @@ def test_tampered_bearer_token_is_rejected(client: TestClient) -> None:
         json={
             "email": "beta.developer@example.com",
             "password": DEMO_PASSWORD,
+            "session_mode": "token",
         },
     )
     token = login.json()["access_token"]

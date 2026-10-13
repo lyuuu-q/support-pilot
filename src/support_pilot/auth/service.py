@@ -12,7 +12,7 @@ from support_pilot.auth.contracts import TokenResponse
 from support_pilot.config import Settings, get_settings
 from support_pilot.domain.enums import UserStatus
 from support_pilot.domain.errors import AuthenticationError, DomainError
-from support_pilot.infrastructure.models import AuditEvent, UserAccount
+from support_pilot.infrastructure.models import AuditEvent, AuthSession, UserAccount
 from support_pilot.infrastructure.repositories import SupportRepository
 
 ALGORITHM = "HS256"
@@ -58,6 +58,7 @@ def issue_access_token(
     *,
     settings: Settings | None = None,
     now: datetime | None = None,
+    session_id: UUID | None = None,
 ) -> TokenResponse:
     resolved = settings or get_settings()
     secret = _require_secret(resolved.jwt_secret)
@@ -74,18 +75,15 @@ def issue_access_token(
         "exp": expires_at,
         "jti": uuid4().hex,
     }
+    if session_id is not None:
+        payload["sid"] = str(session_id)
     return TokenResponse(
         access_token=jwt.encode(payload, secret, algorithm=ALGORITHM),
         expires_in=resolved.jwt_access_token_minutes * 60,
     )
 
 
-def authenticate_token(
-    session: Session,
-    token: str,
-    *,
-    settings: Settings | None = None,
-) -> UserAccount:
+def decode_access_token(token: str, *, settings: Settings | None = None) -> dict[str, object]:
     resolved = settings or get_settings()
     secret = _require_secret(resolved.jwt_secret)
     try:
@@ -97,9 +95,52 @@ def authenticate_token(
             issuer=resolved.jwt_issuer,
             options={"require": ["sub", "role", "iss", "aud", "iat", "nbf", "exp", "jti"]},
         )
-        user_id = UUID(payload["sub"])
-    except (InvalidTokenError, KeyError, TypeError, ValueError):
-        raise AuthenticationError("invalid or expired bearer token") from None
+    except InvalidTokenError as error:
+        raise AuthenticationError("invalid or expired access token") from error
+    return dict(payload)
+
+
+def authenticate_token(
+    session: Session,
+    token: str,
+    *,
+    settings: Settings | None = None,
+    require_session: bool = False,
+) -> UserAccount:
+    user, _session = _resolve_token_identity(
+        session, token, settings=settings, require_session=require_session
+    )
+    return user
+
+
+def authenticate_cookie_token(
+    session: Session,
+    token: str,
+    *,
+    settings: Settings | None = None,
+) -> tuple[UserAccount, AuthSession]:
+    """Authenticate an access token that must be bound to an active browser session."""
+    user, auth_session = _resolve_token_identity(
+        session, token, settings=settings, require_session=True
+    )
+    if auth_session is None:  # pragma: no cover - require_session always resolves a row
+        raise AuthenticationError("access token is not bound to a session")
+    return user, auth_session
+
+
+def _resolve_token_identity(
+    session: Session,
+    token: str,
+    *,
+    settings: Settings | None = None,
+    require_session: bool = False,
+) -> tuple[UserAccount, AuthSession | None]:
+    payload = decode_access_token(token, settings=settings)
+    try:
+        user_id = UUID(str(payload["sub"]))
+    except (KeyError, TypeError, ValueError):
+        raise AuthenticationError("invalid or expired access token") from None
+    auth_session = _require_active_session(session, payload) if require_session else None
     user = SupportRepository(session).get_user(user_id)
     expected_tenant = str(user.tenant_id) if user is not None and user.tenant_id else None
     if (
@@ -109,7 +150,29 @@ def authenticate_token(
         or payload.get("tid") != expected_tenant
     ):
         raise AuthenticationError("token identity is no longer active")
-    return user
+    return user, auth_session
+
+
+def _require_active_session(session: Session, payload: dict[str, object]) -> AuthSession:
+    raw_session_id = payload.get("sid")
+    if not isinstance(raw_session_id, str):
+        raise AuthenticationError("access token is not bound to a session")
+    try:
+        session_id = UUID(raw_session_id)
+    except ValueError:
+        raise AuthenticationError("access token session id is invalid") from None
+    auth_session = session.get(AuthSession, session_id)
+    expires_at = auth_session.expires_at if auth_session is not None else None
+    if expires_at is not None and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if (
+        auth_session is None
+        or auth_session.status != "active"
+        or expires_at is None
+        or expires_at <= datetime.now(UTC)
+    ):
+        raise AuthenticationError("session is no longer active")
+    return auth_session
 
 
 def _require_secret(secret: SecretStr | None) -> str:
@@ -128,15 +191,17 @@ def record_auth_event(
     outcome: str,
     reason_code: str,
     tenant_id: UUID | None = None,
+    action: str = "auth.authenticate",
+    resource_id: str = "access_token",
 ) -> None:
     session.add(
         AuditEvent(
             tenant_id=tenant_id,
             actor_type="user" if outcome == "success" else "system",
             actor_id=actor_id,
-            action="auth.authenticate",
+            action=action,
             resource_type="session",
-            resource_id="access_token",
+            resource_id=resource_id,
             outcome=outcome,
             reason_code=reason_code,
             metadata_redacted={},
