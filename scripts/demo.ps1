@@ -5,10 +5,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# 命令行脚本是"非浏览器客户端"，显式请求 Bearer 令牌；浏览器端使用 HttpOnly Cookie 会话。
 function Login-DemoUser([string]$Email) {
     return Invoke-RestMethod -Method Post -Uri "$ApiBase/auth/login" -ContentType 'application/json' -Body (@{
         email = $Email
         password = $DemoPassword
+        session_mode = 'token'
     } | ConvertTo-Json)
 }
 
