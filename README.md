@@ -162,13 +162,21 @@ Agent、RAG 与历史清理提供 `agent.run`、`agent.resume`、`rag.retrieval`
 
 日志写入被忽略的 `logs/`。完整命令、Span/指标清单与排障见[运维手册](./docs/operations/runbook.md)。
 
+## 浏览器会话与 CSRF
+
+浏览器端不再把令牌存进 `localStorage`：登录后由服务端下发三个 Cookie——`support_pilot_access`、`support_pilot_refresh`（均 HttpOnly）和可被前端读取的 `support_pilot_csrf`。所有写请求（POST/PUT/PATCH/DELETE）必须带 `X-CSRF-Token` 头并与该 Cookie 一致，同时与会话行绑定；不满足返回 403 `csrf_token_invalid` 并写审计。刷新页面时前端先试 `/auth/me`，401 再试一次 `/auth/refresh`，两者都失败才回到登录页。
+
+访问令牌带 `sid` 声明并绑定会话行，所以登出或撤销后立即失效，而不是等令牌过期。refresh 令牌每次使用都会轮换，旧令牌重放返回 401。命令行脚本、集成测试与第三方客户端仍可显式使用 `session_mode="token"` 获取 Bearer 令牌；`scripts/demo.ps1` 即使用该模式。
+
+本地默认 `SUPPORT_PILOT_AUTH_COOKIE_SECURE=false`，通过 HTTPS 部署时必须改为 `true`。当前实现未包含设备列表、撤销全部会话和 OIDC；`SameSite=Lax` 加双提交是纵深防御，不是 CSRF 的形式化证明。
+
 ## 工单通知与验证边界
 
 创建工单的数据库事务提交后，系统通过可配置的 `OutboundChannel` 发送通知；通知失败只记录公开工单号，不回滚已经创建的工单，使用同一幂等键重放也不会重复投递。默认 `log` 通道无需外部服务；`smtp` 和 `webhook` 通过 `.env` 中的 `SUPPORT_PILOT_NOTIFICATION_CHANNEL` 切换。
 
 SMTP 密码与 Webhook URL 使用 `SecretStr` 保存；认证 SMTP 强制启用证书和主机名校验，Webhook 强制 HTTPS、显式主机白名单并拒绝非公网 IP 与环境代理。自动化测试只使用 Mock/Fake 外部边界，不代表真实邮件或群机器人已经完成线上投递验证。
 
-当前验证结果为 122 项后端测试通过；10 项前端单元测试和 1 条 Chromium 业务 E2E 已在本机复跑通过；80 场景 deterministic Agent 评测 80/80；faithfulness v2 的 claim support rate 为 1.000、false answer rate 为 0.000、claim coverage 为 0.8333。Alembic upgrade/check 已通过。浏览器 E2E 使用确定性 Provider、隔离的 `support_pilot_test` 数据库和 `log` 通知通道，不会调用付费模型或外部通知服务。
+当前验证结果为 127 项后端测试通过；13 项前端单元测试和 1 条浏览器业务 E2E 已在本机复跑通过；80 场景 deterministic Agent 评测 80/80；faithfulness v2 的 claim support rate 为 1.000、false answer rate 为 0.000、claim coverage 为 0.8333。Alembic upgrade/check 已通过。浏览器 E2E 使用确定性 Provider、隔离的 `support_pilot_test` 数据库和 `log` 通知通道，不会调用付费模型或外部通知服务。
 
 ## 验证
 
@@ -182,8 +190,11 @@ Set-Location frontend
 npm run lint
 npm run test
 npm run build
-$env:PLAYWRIGHT_BROWSERS_PATH = 'D:\model-cache\support-pilot\playwright'
 npx playwright install chromium
+npm run test:e2e
+
+# 无法下载 Playwright 自带浏览器时，可改用系统安装的浏览器通道（Chrome/Edge）：
+$env:E2E_BROWSER_CHANNEL = 'chrome'
 npm run test:e2e
 ```
 
@@ -261,3 +272,7 @@ npm run test:e2e
 - [第十六阶段可观测性评测](./docs/evaluation/stage-16-observability-evaluation.md)
 - [第十六阶段学习说明](./docs/learning/stage-16-observability-and-maintenance.md)
 - [运维手册](./docs/operations/runbook.md)
+- [第十七阶段 Cookie 会话验收](./docs/product/stage-17-acceptance.md)
+- [Cookie 会话与 CSRF ADR](./docs/adr/0016-cookie-sessions-and-csrf.md)
+- [第十七阶段会话评测](./docs/evaluation/stage-17-cookie-session-evaluation.md)
+- [第十七阶段学习说明](./docs/learning/stage-17-cookie-sessions-and-csrf.md)

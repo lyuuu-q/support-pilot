@@ -78,9 +78,18 @@ Windows Task Scheduler 可创建每日任务，操作使用：
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File <repo>\scripts\run_maintenance.ps1 -Execute
 ```
 
-## 5. 故障排查
+## 5. 浏览器会话排障
+
+- 登录后立刻 401：确认浏览器携带 `support_pilot_access`/`support_pilot_refresh` Cookie，且前后端同源（开发时走 Vite 代理）；
+- 写操作 403 `csrf_token_invalid`：确认请求带 `X-CSRF-Token` 且等于 `support_pilot_csrf` Cookie 值；
+- 用户被强制登出：refresh Cookie 只作用于 `/api/v1/auth`，检查反向代理是否改写路径前缀；
+- 令牌被撤销后仍能访问：确认没有绕过 Cookie 路径使用 Bearer 令牌（Bearer 不校验会话状态，供脚本使用）；
+- 生产 HTTPS 部署必须设置 `SUPPORT_PILOT_AUTH_COOKIE_SECURE=true`。
+
+## 6. 故障排查
 
 - Docker Engine 未启动：先启动 Docker Desktop，再执行 `docker compose ps`；
 - Collector 无输出：确认 `SUPPORT_PILOT_OTEL_ENABLED=true` 且端点正确；
 - 数据库连接失败：确认 `postgres`/`postgres-test` 容器 healthy；
-- 清理脚本失败：先用默认 dry-run 检查，不要在保留期不确定时直接执行。
+- 清理脚本失败：先用默认 dry-run 检查，不要在保留期不确定时直接执行；
+- 浏览器 E2E 无法启动：若 Playwright 自带 Chromium 下载失败，可设置 `E2E_BROWSER_CHANNEL=chrome`（或 `msedge`）使用系统浏览器，此时录屏会被关闭。

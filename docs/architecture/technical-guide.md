@@ -40,6 +40,8 @@ LLM 只输出严格 Schema 的意图与参数候选，所有外部输入由 Pyda
 
 ### 当前最值得改的三个点？
 
-1. 将 RAG calibration/test 分离，加入真实公开文档、难负例和逐主张引用评测；
-2. 在现有 Chromium 主闭环 E2E 基础上增加 SSE 取消/断线恢复、队列分页和多浏览器覆盖；
-3. 用 OIDC + HttpOnly Cookie 替换本地 JWT/localStorage，并把 OTel 接入 Collector、指标与日志关联。
+1. 用 OIDC + 邮箱/企业目录替换本地口令登录，并补上设备列表、撤销全部会话与并发刷新收敛；
+2. 在现有浏览器主闭环 E2E 基础上增加 SSE 取消/断线恢复、队列分页和多浏览器覆盖；
+3. 把 OTel Collector 接到持久化后端（Tempo/Prometheus）、补充 Token/成本指标与告警规则。
+
+已完成的配套改造：RAG calibration/holdout 分离与 claim 级忠实度评测、SSE 断线回放与前端自动恢复、工单队列游标分页、Agent checkpoint 恢复、历史保留清理、OTLP Trace+Metrics 与默认 dry-run 的维护脚本、以及浏览器端 HttpOnly Cookie 会话 + CSRF 双提交 + 刷新轮换（见 ADR 0016）。
