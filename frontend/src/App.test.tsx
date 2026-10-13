@@ -41,20 +41,22 @@ function sseResponse(): Response {
 }
 
 afterEach(() => {
-  localStorage.clear()
   vi.unstubAllGlobals()
 })
 
 describe('SupportPilot console', () => {
-  it('renders live Agent progress and the final evidence-led answer', async () => {
-    localStorage.setItem('support-pilot-token', 'customer-token')
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+  it('restores the cookie session and renders live Agent progress', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const url = String(input)
       if (url.endsWith('/auth/me')) return jsonResponse(customer)
       if (url.endsWith('/agent/resolve/stream')) return sseResponse()
       throw new Error(`unexpected request: ${url}`)
-    }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
     render(<App />)
+
+    await screen.findByText('Alpha Admin')
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ credentials: 'include' }))
 
     await screen.findByText('Alpha Admin')
     await userEvent.click(screen.getByRole('button', { name: '开始诊断' }))
@@ -67,7 +69,6 @@ describe('SupportPilot console', () => {
   })
 
   it('stops waiting and safely retries the last action', async () => {
-    localStorage.setItem('support-pilot-token', 'customer-token')
     let streamCalls = 0
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
@@ -100,7 +101,6 @@ describe('SupportPilot console', () => {
     expect(streamCalls).toBe(2)
   })
   it('lets a support agent claim an open handoff ticket', async () => {
-    localStorage.setItem('support-pilot-token', 'support-token')
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
       if (url.endsWith('/auth/me')) return jsonResponse(supportAgent)
@@ -120,7 +120,6 @@ describe('SupportPilot console', () => {
     expect(screen.getByText('open → triaged')).toBeInTheDocument()
   })
   it('recovers a dropped stream from persisted events', async () => {
-    localStorage.setItem('support-pilot-token', 'customer-token')
     const recoveredResult = {
       request_id: 'run-1', session_id: 's', trace_id: 'trace-recovered', outcome: 'answered',
       intent: 'knowledge', risk_level: 'R1', message: '已恢复的回答', response_mode: 'extractive',
@@ -164,4 +163,33 @@ describe('SupportPilot console', () => {
     expect(screen.getByText('preflight_safety')).toBeInTheDocument()
   })
 
+  it('falls back to the login form when no session can be restored', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('/auth/me')) {
+        return new Response(JSON.stringify({ error: { code: 'authentication_required', message: 'no session' } }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      if (url.endsWith('/auth/refresh')) {
+        return new Response(JSON.stringify({ error: { code: 'authentication_required', message: 'no session' } }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      if (url.endsWith('/auth/login')) {
+        expect(init?.credentials).toBe('include')
+        return jsonResponse({ user: customer, csrf_token: 'csrf-1', expires_in: 1800 })
+      }
+      throw new Error(`unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    await userEvent.type(await screen.findByLabelText('密码'), 'SupportPilotDemo!2026')
+    await userEvent.click(screen.getByRole('button', { name: '进入工作台' }))
+
+    expect(await screen.findByText('Alpha Admin')).toBeInTheDocument()
+  })
 })

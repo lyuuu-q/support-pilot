@@ -15,6 +15,10 @@ if (databaseName !== 'support_pilot_test') {
   throw new Error('E2E_DATABASE_URL must target support_pilot_test')
 }
 
+// CI 使用 Playwright 自带 Chromium；本地若无法下载浏览器，可用系统安装的浏览器通道：
+//   $env:E2E_BROWSER_CHANNEL = 'chrome'   # 或 'msedge'
+const browserChannel = process.env.E2E_BROWSER_CHANNEL
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 120_000,
@@ -29,9 +33,18 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:15174',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    // 系统浏览器通道下不录屏：Playwright 录屏依赖它自己下载的 ffmpeg。
+    video: browserChannel ? 'off' : 'retain-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        ...(browserChannel ? { channel: browserChannel as 'chrome' | 'msedge' } : {}),
+      },
+    },
+  ],
   webServer: [
     {
       command: [

@@ -1,12 +1,12 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ApiError,
   claimTicket,
-  getCurrentUser,
   listRunEvents,
   listTickets,
   login,
+  logout,
   resumeAgentRun,
+  restoreSession,
   streamAgent,
   submitFeedback,
   transitionTicket,
@@ -14,13 +14,11 @@ import {
 import type { AgentResponse, CurrentUser, Ticket, TicketStatus, TraceEvent } from './types'
 import './styles.css'
 
-const TOKEN_KEY = 'support-pilot-token'
-
 function messageFrom(error: unknown): string {
   return error instanceof Error ? error.message : '发生未知错误'
 }
 
-function Login({ onAuthenticated }: { onAuthenticated: (token: string, user: CurrentUser) => void }) {
+function Login({ onAuthenticated }: { onAuthenticated: (user: CurrentUser) => void }) {
   const [email, setEmail] = useState('alpha.admin@example.com')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -31,10 +29,8 @@ function Login({ onAuthenticated }: { onAuthenticated: (token: string, user: Cur
     setBusy(true)
     setError('')
     try {
-      const token = await login(email, password)
-      const user = await getCurrentUser(token)
-      localStorage.setItem(TOKEN_KEY, token)
-      onAuthenticated(token, user)
+      const user = await login(email, password)
+      onAuthenticated(user)
     } catch (caught) {
       setError(messageFrom(caught))
     } finally {
@@ -96,7 +92,7 @@ function ClaimEvidence({ claims }: { claims: AgentResponse['claims'] }) {
   )
 }
 
-function CustomerWorkspace({ token }: { token: string }) {
+function CustomerWorkspace() {
   const [message, setMessage] = useState('HTTP 429 响应里的 Retry-After 应该如何处理？')
   const [featureCode, setFeatureCode] = useState('')
   const [metricCode, setMetricCode] = useState('')
@@ -142,7 +138,7 @@ function CustomerWorkspace({ token }: { token: string }) {
       ...(confirmation ? { confirmation } : {}),
     }
     try {
-      await streamAgent(token, payload, {
+      await streamAgent(payload, {
         onProgress: (event) => setTrace((current) => [...current, event]),
         onEventId: (eventId) => {
           lastEventIdRef.current = eventId
@@ -178,7 +174,7 @@ function CustomerWorkspace({ token }: { token: string }) {
   }
 
   async function recoverRun(runId: string) {
-    const response = await listRunEvents(token, runId)
+    const response = await listRunEvents(runId)
     const progressEvents = response.items
       .filter((event) => event.event === 'progress')
       .map((event) => event.payload as unknown as TraceEvent)
@@ -189,7 +185,7 @@ function CustomerWorkspace({ token }: { token: string }) {
       confirmationKeyRef.current = null
       return
     }
-    const resumed = await resumeAgentRun(token, runId)
+    const resumed = await resumeAgentRun(runId)
     setResult(resumed)
     confirmationKeyRef.current = null
   }
@@ -255,7 +251,7 @@ const NEXT_STATUS: Partial<Record<TicketStatus, TicketStatus[]>> = {
   resolved: ['closed', 'in_progress'],
 }
 
-function SupportWorkspace({ token, user }: { token: string; user: CurrentUser }) {
+function SupportWorkspace({ user }: { user: CurrentUser }) {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -270,7 +266,7 @@ function SupportWorkspace({ token, user }: { token: string; user: CurrentUser })
 
   const loadTickets = useCallback(async (append = false) => {
     try {
-      const response = await listTickets(token, {
+      const response = await listTickets({
         status: statusFilter || undefined,
         q: activeQuery || undefined,
         cursor: append ? nextCursorRef.current ?? undefined : undefined,
@@ -282,7 +278,7 @@ function SupportWorkspace({ token, user }: { token: string; user: CurrentUser })
     } catch (caught) {
       setError(messageFrom(caught))
     }
-  }, [activeQuery, statusFilter, token])
+  }, [activeQuery, statusFilter])
 
   useEffect(() => {
     void loadTickets()
@@ -324,26 +320,26 @@ function SupportWorkspace({ token, user }: { token: string; user: CurrentUser })
           <section className="detail-card"><h3>问题描述</h3><p>{selected.description}</p></section>
           <section className="detail-card"><h3>诊断上下文</h3><pre>{JSON.stringify(selected.diagnostic_context, null, 2)}</pre></section>
           <section className="detail-card actions-card"><h3>人工处理</h3>
-            {!selected.assignee_id && selected.status === 'open' && <button className="primary" disabled={busy} onClick={() => mutate(() => claimTicket(token, selected))}>认领并分诊</button>}
-            {selected.assignee_id === user.id && (NEXT_STATUS[selected.status] ?? []).map((status) => <button key={status} className="ghost" disabled={busy} onClick={() => mutate(() => transitionTicket(token, selected, status, `人工处理：转为 ${status}`))}>转为 {status}</button>)}
+            {!selected.assignee_id && selected.status === 'open' && <button className="primary" disabled={busy} onClick={() => mutate(() => claimTicket(selected))}>认领并分诊</button>}
+            {selected.assignee_id === user.id && (NEXT_STATUS[selected.status] ?? []).map((status) => <button key={status} className="ghost" disabled={busy} onClick={() => mutate(() => transitionTicket(selected, status, `人工处理：转为 ${status}`))}>转为 {status}</button>)}
             {selected.assignee_id && selected.assignee_id !== user.id && <p className="muted">该工单已由其他支持人员认领。</p>}
           </section>
           <section className="detail-card"><h3>状态轨迹</h3>{selected.transitions.length ? <ol className="transition-list">{selected.transitions.map((transition) => <li key={transition.id}><strong>{transition.from_status} → {transition.to_status}</strong><span>{transition.reason}</span></li>)}</ol> : <p className="muted">尚无人工状态变更。</p>}</section>
-          {selected.agent_run_id && <FeedbackForm token={token} ticket={selected} />}
+          {selected.agent_run_id && <FeedbackForm ticket={selected} />}
         </>}
       </main>
     </div>
   )
 }
 
-function FeedbackForm({ token, ticket }: { token: string; ticket: Ticket }) {
+function FeedbackForm({ ticket }: { ticket: Ticket }) {
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const data = new FormData(event.currentTarget)
     try {
-      await submitFeedback(token, ticket, {
+      await submitFeedback(ticket, {
         agent_run_id: ticket.agent_run_id,
         disposition: data.get('disposition'),
         resolution_category: ticket.category,
@@ -357,19 +353,17 @@ function FeedbackForm({ token, ticket }: { token: string; ticket: Ticket }) {
 }
 
 export default function App() {
-  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) ?? '')
   const [user, setUser] = useState<CurrentUser | null>(null)
-  const [restoring, setRestoring] = useState(Boolean(token))
+  const [restoring, setRestoring] = useState(true)
 
   useEffect(() => {
-    if (!token || user) return
-    getCurrentUser(token).then(setUser).catch((error: unknown) => {
-      if (error instanceof ApiError && error.status === 401) localStorage.removeItem(TOKEN_KEY)
-      setToken('')
-    }).finally(() => setRestoring(false))
-  }, [token, user])
+    restoreSession()
+      .then(setUser)
+      .catch(() => setUser(null))
+      .finally(() => setRestoring(false))
+  }, [])
 
   if (restoring) return <div className="splash">恢复安全会话…</div>
-  if (!token || !user) return <Login onAuthenticated={(nextToken, nextUser) => { setToken(nextToken); setUser(nextUser) }} />
-  return <div className="app-shell"><header className="topbar"><div className="brand"><span>SP</span><div><strong>SupportPilot</strong><small>Evidence-led support</small></div></div><div className="user-chip"><div><strong>{user.display_name}</strong><small>{user.role}</small></div><button onClick={() => { localStorage.removeItem(TOKEN_KEY); setToken(''); setUser(null) }}>退出</button></div></header>{user.role === 'support_agent' ? <SupportWorkspace token={token} user={user} /> : <CustomerWorkspace token={token} />}</div>
+  if (!user) return <Login onAuthenticated={setUser} />
+  return <div className="app-shell"><header className="topbar"><div className="brand"><span>SP</span><div><strong>SupportPilot</strong><small>Evidence-led support</small></div></div><div className="user-chip"><div><strong>{user.display_name}</strong><small>{user.role}</small></div><button onClick={() => { void logout().catch(() => undefined).finally(() => setUser(null)) }}>退出</button></div></header>{user.role === 'support_agent' ? <SupportWorkspace user={user} /> : <CustomerWorkspace />}</div>
 }
