@@ -163,6 +163,22 @@ describe('SupportPilot console', () => {
     expect(screen.getByText('preflight_safety')).toBeInTheDocument()
   })
 
+  it('revokes every device session from the console', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/auth/me')) return jsonResponse(customer)
+      if (url.endsWith('/auth/logout-all')) return new Response(null, { status: 204 })
+      throw new Error(`unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    await screen.findByText('Alpha Admin')
+    await userEvent.click(screen.getByRole('button', { name: '登出所有设备' }))
+
+    expect(await screen.findByRole('button', { name: '进入工作台' })).toBeInTheDocument()
+  })
+
   it('falls back to the login form when no session can be restored', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)

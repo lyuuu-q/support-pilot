@@ -70,6 +70,8 @@ export const refreshSession = () =>
 
 export const logout = () => request<void>('/auth/logout', { method: 'POST' })
 
+export const logoutAll = () => request<void>('/auth/logout-all', { method: 'POST' })
+
 /** Restore a browser session: reuse the access cookie, rotate once, otherwise stay logged out. */
 export async function restoreSession(): Promise<CurrentUser | null> {
   try {

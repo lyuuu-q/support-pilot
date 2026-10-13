@@ -5,6 +5,7 @@ import {
   listTickets,
   login,
   logout,
+  logoutAll,
   resumeAgentRun,
   restoreSession,
   streamAgent,
@@ -365,5 +366,5 @@ export default function App() {
 
   if (restoring) return <div className="splash">恢复安全会话…</div>
   if (!user) return <Login onAuthenticated={setUser} />
-  return <div className="app-shell"><header className="topbar"><div className="brand"><span>SP</span><div><strong>SupportPilot</strong><small>Evidence-led support</small></div></div><div className="user-chip"><div><strong>{user.display_name}</strong><small>{user.role}</small></div><button onClick={() => { void logout().catch(() => undefined).finally(() => setUser(null)) }}>退出</button></div></header>{user.role === 'support_agent' ? <SupportWorkspace user={user} /> : <CustomerWorkspace />}</div>
+  return <div className="app-shell"><header className="topbar"><div className="brand"><span>SP</span><div><strong>SupportPilot</strong><small>Evidence-led support</small></div></div><div className="user-chip"><div><strong>{user.display_name}</strong><small>{user.role}</small></div><button onClick={() => { void logout().catch(() => undefined).finally(() => setUser(null)) }}>退出</button><button title="撤销本账号的全部会话" onClick={() => { void logoutAll().catch(() => undefined).finally(() => setUser(null)) }}>登出所有设备</button></div></header>{user.role === 'support_agent' ? <SupportWorkspace user={user} /> : <CustomerWorkspace />}</div>
 }
