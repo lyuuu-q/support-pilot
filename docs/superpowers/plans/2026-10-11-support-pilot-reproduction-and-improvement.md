@@ -286,6 +286,20 @@
 - **Grafana 看板 / Alertmanager 通知 / 长期存储**：本机无法拉取 Prometheus 镜像，交付的是导出端点 + 抓取与告警配置 + 指标快照；
 - **拆分检索/Agent 服务**：计划中本就写明"仅在压测证明有必要时"再做，本轮未做压测。
 
+### 发布到 GitHub
+
+本仓库克隆自上游，远端已按 fork 约定整理：`upstream` = 原作者仓库（只读参考），`origin` 留给你自己的仓库。
+
+```powershell
+cd <repo>
+git remote add origin https://github.com/<你的用户名>/support-pilot.git
+git push -u origin main
+```
+
+- 首次推送会触发 GitHub 登录（浏览器/设备码）；若使用 PAT，请用 `repo` 权限。
+- 若希望向上游提交而不是自建仓库，请先在 GitHub 上 Fork，再推送到你自己的 fork，然后开 Pull Request。
+- 整库备份：`git bundle create <路径>.bundle --all`，可用 `git clone <路径>.bundle` 还原。
+
 ### 后续建议（超出本计划）
 
 1. 用真实模型（Qwen）在 30–50 条意图/回答/门控用例上重跑评测，并做 prompt 版本对比；
