@@ -16,3 +16,4 @@ build/
 frontend/playwright-report/
 frontend/test-results/
 logs/
+recordings/

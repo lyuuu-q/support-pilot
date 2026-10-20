@@ -43,4 +43,4 @@
 - 无 Grafana 看板与长期存储；
 - 告警阈值为本机小流量经验值，未按生产校准；
 - 计划任务脚本未实际注册（需要管理员权限）；
-- **多浏览器 E2E 决定不做**：原因见 `docs/superpowers/plans/2026-10-14-metrics-backend-and-ops-automation.md`。
+- **多浏览器 E2E 决定不做**：本机 CDN 无法获取 Firefox/WebKit，且 Windows 上的 WebKit 并非 Safari、信号价值低；SSE/Cookie/OIDC 等关键路径已由 Chromium 真实浏览器用例与后端测试覆盖。
